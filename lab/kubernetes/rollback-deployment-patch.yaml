@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft
+  namespace: bluemap-sophisticated-staging
+spec:
+  replicas: 0
+  template:
+    metadata:
+      annotations:
+        bluemap.guenter.cloud/addon-sha256: null
+        bluemap.guenter.cloud/gallery-sha256: null
+        bluemap.guenter.cloud/pose-bundle-sha256: null
+        bluemap.guenter.cloud/stone-statues-mode: null
+    spec:
+      containers:
+        - name: minecraft
+          env:
+            - name: BLUEMAP_COBBLEMON_STATUES_POSE_BUNDLE
+              $patch: delete
+            - name: BLUEMAP_COBBLEMON_STATUES_POSE_BUNDLE_SHA256
+              $patch: delete
+      initContainers:
+        - name: install-local-artifacts
+          args:
+            - |
+              addon=/data/config/bluemap/packs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar
+              if [ -e "${addon}" ]; then
+                rm -f -- "${addon}"
+              fi
+              rm -f -- \
+                /data/config/bluemap/packs/zz-0426-ccc-compat.zip \
+                /data/config/bluemap/packs/zz-0418-allthemons.zip \
+                /data/config/bluemap/packs/zz-0308-zamega.zip \
+                /data/config/bluemap/packs/zz-0307-mega-showdown.zip \
+                /data/config/bluemap/packs/zz-0196-cobblemon.zip
+              rm -rf -- /data/bluemap/web/maps/cobblemonstonestatues_staging
+              test ! -e "${addon}"
+              test "$(find /data/config/bluemap/packs -maxdepth 1 -type l \
+                -name 'zz-*.zip' | wc -l)" -eq 0
+              printf 'STONE_STATUES_ADDON_REMOVED\n'

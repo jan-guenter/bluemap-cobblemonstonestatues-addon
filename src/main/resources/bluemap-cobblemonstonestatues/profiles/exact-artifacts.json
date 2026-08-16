@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "stone_statues": {
+    "mod_id": "cobblemonstonestatues",
+    "version": "1.1",
+    "size": 170977,
+    "sha256": "0fece8e5a988b660f2b608a316f88e2572290835fec1acf67d78329133e92f09"
+  },
+  "cobblemon": {
+    "mod_id": "cobblemon",
+    "version": "1.7.3+1.21.1",
+    "size": 128748941,
+    "sha256": "962d75df4fb649d94863a7a7d130d4d2b3de4da9b3cae4c44b1ce90f37ec0ed5",
+    "embedded_commit": "37264aff0f6c90c9f9a79bbdfc712bd11929a38c"
+  }
+}

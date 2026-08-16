@@ -1,0 +1,713 @@
+// SPDX-License-Identifier: MIT
+
+plugins {
+    id 'java-library'
+    id 'checkstyle'
+    id 'maven-publish'
+}
+
+group = addon_group
+version = addon_version
+
+base {
+    archivesName = artifact_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = uri('https://repo.bluecolored.de/releases')
+        content { includeGroupByRegex('de\\.bluecolored.*') }
+    }
+}
+
+dependencies {
+    compileOnly "de.bluecolored:bluemap-core:${bluemap_version}"
+    compileOnly 'org.jetbrains:annotations:23.0.0'
+    compileOnly 'org.joml:joml:1.10.5'
+
+    testImplementation "de.bluecolored:bluemap-core:${bluemap_version}"
+    testImplementation 'org.jetbrains:annotations:23.0.0'
+    testImplementation 'org.joml:joml:1.10.5'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    includeEmptyDirs = false
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    for (String property : [
+            'stoneStatuesJar', 'cobblemonJar', 'poseCatalogDir'
+    ]) {
+        def value = providers.gradleProperty(property)
+        if (value.isPresent()) {
+            systemProperty property, value.get()
+        }
+    }
+    systemProperty 'stoneRuntimeFixture', providers.gradleProperty('stoneRuntimeFixture')
+            .getOrElse(file(
+                    'provenance/cleanroom/stone-box-replay/fixtures.ndjson'
+            ).absolutePath)
+}
+
+tasks.register('verifyPhysicalBundle', JavaExec) {
+    group = 'verification'
+    description = 'Verifies one complete operator-local physical-client format-2 export.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.janguenter.bluemap.cobblemonstonestatues.catalog.PhysicalBundleVerifier'
+    maxHeapSize = '2g'
+    jvmArgs '-ea'
+    doFirst {
+        def bundle = providers.gradleProperty('poseBundle').orNull
+        def sha256 = providers.gradleProperty('poseBundleSha256').orNull
+        if (bundle == null || sha256 == null) {
+            throw new GradleException(
+                    'verifyPhysicalBundle requires -PposeBundle and -PposeBundleSha256'
+            )
+        }
+        setArgs([file(bundle).absolutePath, sha256])
+    }
+}
+
+tasks.named('processResources').configure {
+    inputs.property('version', project.version)
+    filesMatching('bluemap.addon.json') {
+        expand(version: project.version)
+    }
+}
+
+checkstyle {
+    toolVersion = '10.18.2'
+    configFile = file('config/checkstyle/checkstyle.xml')
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes(
+                'Automatic-Module-Name': 'io.github.janguenter.bluemap.cobblemonstonestatues',
+                'Implementation-Title': addon_name,
+                'Implementation-Version': project.version.toString()
+        )
+    }
+    from('LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-bluemap-cobblemonstonestatues-addon' }
+    }
+    from('NOTICE.md') {
+        into 'META-INF'
+        rename { 'NOTICE-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('THIRD_PARTY.md') {
+        into 'META-INF'
+        rename { 'THIRD_PARTY-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('LICENSES.md') {
+        into 'META-INF'
+        rename { 'LICENSES-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('SOURCE-OFFER.md') {
+        into 'META-INF'
+        rename { 'SOURCE-OFFER-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('LICENSES/MPL-2.0.txt') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSES/LGPL-2.1-only.txt') {
+        into 'META-INF/licenses'
+    }
+    from('provenance/upstreams.json') {
+        into 'META-INF/bluemap-cobblemonstonestatues'
+    }
+}
+
+tasks.named('sourcesJar', Jar).configure {
+    manifest {
+        attributes(
+                'Implementation-Title': addon_name + ' sources',
+                'Implementation-Version': project.version.toString()
+        )
+    }
+    from('LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-bluemap-cobblemonstonestatues-addon' }
+    }
+    from('NOTICE.md') {
+        into 'META-INF'
+        rename { 'NOTICE-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('THIRD_PARTY.md') {
+        into 'META-INF'
+        rename { 'THIRD_PARTY-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('LICENSES.md') {
+        into 'META-INF'
+        rename { 'LICENSES-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('SOURCE-OFFER.md') {
+        into 'META-INF'
+        rename { 'SOURCE-OFFER-bluemap-cobblemonstonestatues-addon.md' }
+    }
+    from('LICENSES/MPL-2.0.txt') {
+        into 'META-INF/licenses'
+    }
+    from('LICENSES/LGPL-2.1-only.txt') {
+        into 'META-INF/licenses'
+    }
+    from('provenance/upstreams.json') {
+        into 'META-INF/bluemap-cobblemonstonestatues'
+    }
+    from('provenance/cleanroom/stone-box-replay') {
+        include 'README.md', 'SPEC.md'
+        into 'META-INF/bluemap-cobblemonstonestatues/cleanroom/stone-box-replay'
+    }
+    from('src/test/java/io/github/janguenter/bluemap/cobblemonstonestatues/'
+            + 'adapter/bluemap522/BlueMap522AdapterTest.java') {
+        into('test/io/github/janguenter/bluemap/cobblemonstonestatues/'
+                + 'adapter/bluemap522')
+    }
+}
+
+def productionJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+def publishedSourcesJar = tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
+def retiredFormatOneEntry = { String path ->
+    path.contains('MeshCodec')
+            || path == 'pose-catalog.json'
+            || path.endsWith('/pose-catalog.json')
+            || path.startsWith('meshes/')
+            || path.contains('/meshes/')
+}
+def retiredFormatOneProbes = [
+        'io/example/MeshCodec.class',
+        'io/example/MeshCodec$Header.class',
+        'io/example/MeshCodec.java',
+        'meshes/legacy.bin',
+        'nested/meshes/legacy.bin',
+        'pose-catalog.json',
+        'nested/pose-catalog.json'
+]
+
+tasks.register('verifyProductionJar') {
+    dependsOn tasks.named('jar')
+    inputs.file(productionJar)
+    doLast {
+        def zip = new java.util.zip.ZipFile(inputs.files.singleFile)
+        try {
+            if (!retiredFormatOneProbes.every(retiredFormatOneEntry)) {
+                throw new GradleException('Retired format-1 production guard is incomplete')
+            }
+            def archiveEntries = zip.entries().collect { it.name }
+            def entries = zip.entries().findAll { !it.directory }.collect { it.name }
+            def required = [
+                    'bluemap.addon.json',
+                    'assets/bluemap_cobblemonstonestatues/blockstates/exact_shape.json',
+                    'bluemap-cobblemonstonestatues/profiles/exact-artifacts.json',
+                    'META-INF/LICENSE-bluemap-cobblemonstonestatues-addon',
+                    'META-INF/licenses/MPL-2.0.txt',
+                    'META-INF/licenses/LGPL-2.1-only.txt',
+                    'META-INF/LICENSES-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/NOTICE-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/SOURCE-OFFER-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/THIRD_PARTY-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/bluemap-cobblemonstonestatues/upstreams.json',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState$RuntimeFrame.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState$MirrorZeroXNormals.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseStateCodec.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'BakedGeometryTopology.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'CleanRoomGeometryCompiler.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/BedrockBoxReplay.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/JomlAdapters.class'
+            ]
+            def missing = required.findAll { !entries.contains(it) }
+            if (!missing.isEmpty()) {
+                throw new GradleException("Production JAR is missing: ${missing}")
+            }
+            def addon = new groovy.json.JsonSlurper().parseText(
+                    zip.getInputStream(zip.getEntry('bluemap.addon.json')).getText('UTF-8')
+            )
+            def upstreams = new groovy.json.JsonSlurper().parseText(
+                    zip.getInputStream(zip.getEntry(
+                            'META-INF/bluemap-cobblemonstonestatues/upstreams.json'
+                    )).getText('UTF-8')
+            )
+            if (addon.id != addon_id
+                    || addon.entrypoint != 'io.github.janguenter.bluemap.cobblemonstonestatues.BlueMapCobblemonStoneStatuesAddon'
+                    || addon.version != project.version.toString()
+                    || addon.dependencies != []
+                    || addon['soft-dependencies'] != []
+                    || upstreams.bluemap.license != 'MIT'
+                    || upstreams.first_party_adapter_framework.license
+                    != 'LGPL-2.1-only'
+                    || upstreams.cleanroom_box_replay.fixture_sha256
+                    != 'b287b9ff5b6bdd0aa9d7bf04865a1d9bb28f772e59b10333c224ea552fbc848f') {
+                throw new GradleException('BlueMap add-on metadata mismatch')
+            }
+            def foreignClasses = entries.findAll {
+                it.endsWith('.class')
+                        && !it.startsWith('io/github/janguenter/bluemap/cobblemonstonestatues/')
+            }
+            def forbidden = archiveEntries.findAll {
+                it.endsWith('.jar')
+                        || it.endsWith('.ndjson')
+                        || it.endsWith('.geo.json')
+                        || it.endsWith('.animation.json')
+                        || it.endsWith('.png')
+                        || retiredFormatOneEntry(it)
+                        || it.startsWith('assets/cobblemon/')
+                        || it.startsWith('assets/cobblemonstonestatues/')
+                        || it.startsWith('com/cobblemon/')
+                        || it.startsWith('com/jorgaomc/')
+                        || it.startsWith('net/minecraft/')
+                        || it.startsWith('net/neoforged/')
+                        || it.contains('GeometryReplayCompiler')
+                        || it.contains('GeometryMeshCompiler')
+            }
+            if (!foreignClasses.isEmpty() || !forbidden.isEmpty()) {
+                throw new GradleException(
+                        "Production JAR boundary mismatch: foreignClasses=${foreignClasses}, "
+                                + "forbidden=${forbidden}"
+                )
+            }
+            def extensionBytecode = new String(zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StoneStatuesResourceExtension.class'
+            )).bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+            def loaderBytecode = new String(zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/'
+                            + 'PoseCatalogLoader.class'
+            )).bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+            if (extensionBytecode.contains('format-2-runtime-not-ready')
+                    || loaderBytecode.contains('format-2 production loader is not ready')
+                    || !extensionBytecode.contains('pose-bundle-invalid')
+                    || !loaderBytecode.contains('operator-local pose bundle identity mismatch')) {
+                throw new GradleException('Format-2 production bytecode is not enabled')
+            }
+            def mpl = zip.getInputStream(zip.getEntry(
+                    'META-INF/licenses/MPL-2.0.txt'
+            )).bytes
+            def mplSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(mpl)
+            )
+            def notice = zip.getInputStream(zip.getEntry(
+                    'META-INF/NOTICE-bluemap-cobblemonstonestatues-addon.md'
+            )).getText('UTF-8')
+            def lgplSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/licenses/LGPL-2.1-only.txt'
+                            )).bytes
+                    )
+            )
+            if (mplSha != '1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5'
+                    || lgplSha != 'c8c96cd98c4c36e7dc348a56405fbc98eab2ca80f6e9e98a11958015908e9ac1'
+                    || !notice.contains('37264aff0f6c90c9f9a79bbdfc712bd11929a38c')
+                    || !notice.contains('Mozilla Public License')
+                    || !notice.contains('f40eed6c1f7f30356bcdfabbc3e2a6455fec7884')
+                    || !notice.contains('LGPL-2.1-only')) {
+                throw new GradleException('Production JAR licensing boundary mismatch')
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.register('verifySourcesJar') {
+    dependsOn tasks.named('sourcesJar')
+    inputs.file(publishedSourcesJar)
+    doLast {
+        def zip = new java.util.zip.ZipFile(inputs.files.singleFile)
+        try {
+            if (!retiredFormatOneProbes.every(retiredFormatOneEntry)) {
+                throw new GradleException('Retired format-1 sources guard is incomplete')
+            }
+            def archiveEntries = zip.entries().collect { it.name }
+            def entries = zip.entries().findAll { !it.directory }.collect { it.name }
+            def projectJava = entries.findAll { it.endsWith('.java') }
+            def required = [
+                    'META-INF/LICENSE-bluemap-cobblemonstonestatues-addon',
+                    'META-INF/licenses/MPL-2.0.txt',
+                    'META-INF/licenses/LGPL-2.1-only.txt',
+                    'META-INF/LICENSES-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/NOTICE-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/SOURCE-OFFER-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/THIRD_PARTY-bluemap-cobblemonstonestatues-addon.md',
+                    'META-INF/bluemap-cobblemonstonestatues/upstreams.json',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseStateCodec.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'BakedGeometryTopology.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'CleanRoomGeometryCompiler.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/BedrockBoxReplay.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/JomlAdapters.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/BlueMap522Adapter.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StatueBlockEntityData.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StoneStatuesRenderer.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StoneStatuesResourceExtension.java',
+                    'test/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/BlueMap522AdapterTest.java',
+                    'META-INF/bluemap-cobblemonstonestatues/cleanroom/'
+                            + 'stone-box-replay/README.md',
+                    'META-INF/bluemap-cobblemonstonestatues/cleanroom/'
+                            + 'stone-box-replay/SPEC.md'
+            ]
+            def missing = required.findAll { !entries.contains(it) }
+            def foreignJava = projectJava.findAll {
+                !it.startsWith('io/github/janguenter/bluemap/cobblemonstonestatues/')
+                        && !it.startsWith(
+                        'test/io/github/janguenter/bluemap/cobblemonstonestatues/'
+                )
+            }
+            def forbidden = archiveEntries.findAll {
+                it.endsWith('.class') || it.endsWith('.jar') || it.endsWith('.geo.json')
+                        || it.endsWith('.ndjson')
+                        || it.endsWith('.animation.json') || it.endsWith('.png')
+                        || retiredFormatOneEntry(it)
+                        || it.startsWith('assets/cobblemon/')
+                        || it.startsWith('assets/cobblemonstonestatues/')
+                        || it.startsWith('com/cobblemon/')
+                        || it.startsWith('com/jorgaomc/')
+                        || it.startsWith('net/minecraft/')
+                        || it.startsWith('net/neoforged/')
+                        || it.contains('GeometryReplayCompiler')
+                        || it.contains('GeometryMeshCompiler')
+            }
+            def coveredSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'BakedGeometryTopology.java'
+            )).getText('UTF-8')
+            def cleanRoomSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/BedrockBoxReplay.java'
+            )).getText('UTF-8')
+            def poseStateSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState.java'
+            )).getText('UTF-8')
+            def poseStateCodecSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseStateCodec.java'
+            )).getText('UTF-8')
+            def lgplSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/BlueMap522Adapter.java'
+            )).getText('UTF-8')
+            def lgplPaths = [
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/BlueMap522Adapter.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StatueBlockEntityData.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StoneStatuesRenderer.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/StoneStatuesResourceExtension.java',
+                    'test/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
+                            + 'bluemap522/BlueMap522AdapterTest.java'
+            ]
+            def badLgplNotices = lgplPaths.findAll { path ->
+                def source = zip.getInputStream(zip.getEntry(path)).getText('UTF-8')
+                !source.contains('SPDX-License-Identifier: LGPL-2.1-only')
+                        || !source.contains('f40eed6c1f7f30356bcdfabbc3e2a6455fec7884')
+                        || !source.contains('Modified in 2026')
+            }
+            def lgplSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/licenses/LGPL-2.1-only.txt'
+                            )).bytes
+                    )
+            )
+            def specSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/bluemap-cobblemonstonestatues/cleanroom/'
+                                            + 'stone-box-replay/SPEC.md'
+                            )).bytes
+                    )
+            )
+            def sourceManifest = new java.util.jar.Manifest(zip.getInputStream(
+                    zip.getEntry('META-INF/MANIFEST.MF')
+            )).mainAttributes
+            def exactProfileSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/profile/'
+                            + 'ExactProfile.java'
+            )).getText('UTF-8')
+            def expectedName = "${artifact_id}-${project.version}-sources.jar"
+            if (!missing.isEmpty() || projectJava.isEmpty() || !foreignJava.isEmpty()
+                    || !forbidden.isEmpty()
+                    || coveredSource.contains('SPDX-License-Identifier: MIT')
+                    || !coveredSource.contains('SPDX-License-Identifier: MPL-2.0')
+                    || !coveredSource.contains(
+                    '37264aff0f6c90c9f9a79bbdfc712bd11929a38c'
+            )
+                    || !cleanRoomSource.contains('SPDX-License-Identifier: MIT')
+                    || !cleanRoomSource.contains(
+                    'b287b9ff5b6bdd0aa9d7bf04865a1d9bb28f772e59b10333c224ea552fbc848f'
+            )
+                    || !poseStateSource.contains('record MirrorZeroXNormals(')
+                    || !poseStateCodecSource.contains('MAGIC = 0x34535441')
+                    || !poseStateCodecSource.contains('public static final int VERSION = 4;')
+                    || !poseStateCodecSource.contains('FRAME_FLOATS = 46;')
+                    || !exactProfileSource.contains(
+                    'public static final boolean FORMAT_2_READY = true;'
+            )
+                    || exactProfileSource.contains(
+                    'public static final boolean FORMAT_2_READY = false;'
+            )
+                    || !lgplSource.contains('SPDX-License-Identifier: LGPL-2.1-only')
+                    || !badLgplNotices.isEmpty()
+                    || lgplSha != 'c8c96cd98c4c36e7dc348a56405fbc98eab2ca80f6e9e98a11958015908e9ac1'
+                    || specSha != '37cd94a5d6dd4068da9056dfd52fdeca37d0dff87d214179f5eebb03e62f2512'
+                    || inputs.files.singleFile.name != expectedName
+                    || sourceManifest.getValue('Implementation-Version')
+                    != project.version.toString()) {
+                throw new GradleException(
+                        "Sources JAR boundary mismatch: missing=${missing}, "
+                                + "foreignJava=${foreignJava}, forbidden=${forbidden}"
+                )
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.register('verifyPythonTools', Exec) {
+    commandLine 'python3', '-m', 'unittest', 'discover',
+            '-s', 'tools/tests', '-p', 'test_*.py'
+}
+
+tasks.register('verifyGallery', Exec) {
+    commandLine 'python3', 'gallery/generate.py', '--check'
+}
+
+def galleryArchive = layout.buildDirectory.file(
+        'gallery/bluemap-cobblemonstonestatues-gallery.zip'
+)
+
+tasks.register('verifyGalleryArchive', Exec) {
+    dependsOn tasks.named('verifyGallery')
+    inputs.dir('gallery/datapack')
+    inputs.file('gallery/package.sh')
+    outputs.file(galleryArchive)
+    doFirst {
+        galleryArchive.get().asFile.parentFile.mkdirs()
+    }
+    commandLine 'gallery/package.sh', galleryArchive.get().asFile.absolutePath
+    doLast {
+        def archive = galleryArchive.get().asFile
+        def expectedEntries = [
+                'data/minecraft/tags/function/load.json',
+                'data/stone_statues_gallery/function/build.mcfunction',
+                'data/stone_statues_gallery/function/clear.mcfunction',
+                'data/stone_statues_gallery/function/load.mcfunction',
+                'data/stone_statues_gallery/function/pose.mcfunction',
+                'data/stone_statues_gallery/function/release.mcfunction',
+                'data/stone_statues_gallery/function/verify.mcfunction',
+                'pack.mcmeta'
+        ]
+        def digest = java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance('SHA-256').digest(archive.bytes)
+        )
+        def zip = new java.util.zip.ZipFile(archive)
+        try {
+            def entries = zip.entries().findAll { !it.directory }.toList()
+            def names = entries.collect { it.name }
+            def timestamps = entries.collect {
+                java.time.LocalDateTime.ofInstant(
+                        it.lastModifiedTime.toInstant(), java.time.ZoneId.systemDefault()
+                )
+            }.toSet()
+            if (archive.length() != 3_153L
+                    || digest != '1d8193b783eb1d30dd347896cc433e6de72549a472d800ff7484b16a17d04121'
+                    || names != expectedEntries
+                    || timestamps != [java.time.LocalDateTime.of(1980, 2, 1, 0, 0)] as Set
+                    || zip.comment != null) {
+                throw new GradleException(
+                        "Gallery archive mismatch: size=${archive.length()}, sha256=${digest}, "
+                                + "entries=${names}, timestamps=${timestamps}, comment=${zip.comment}"
+                )
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.register('verifyPinnedArtifacts', Exec) {
+    def stoneJar = providers.gradleProperty('stoneStatuesJar')
+    def cobblemonJar = providers.gradleProperty('cobblemonJar')
+    doFirst {
+        if (!stoneJar.isPresent() || !cobblemonJar.isPresent()) {
+            throw new GradleException(
+                    'Set -PstoneStatuesJar and -PcobblemonJar to exact ATM 1.2.0 inputs.'
+            )
+        }
+    }
+    commandLine 'python3', 'tools/verify_pinned_artifacts.py',
+            '--stone-statues', stoneJar.getOrElse('missing'),
+            '--cobblemon', cobblemonJar.getOrElse('missing')
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyProductionJar')
+    dependsOn tasks.named('verifySourcesJar')
+    dependsOn tasks.named('verifyPythonTools')
+    dependsOn tasks.named('verifyGallery')
+    dependsOn tasks.named('verifyGalleryArchive')
+    dependsOn 'verifyPomLicenses'
+}
+
+publishing {
+    publications {
+        addon(MavenPublication) {
+            from components.java
+            artifactId = artifact_id
+            pom {
+                name = addon_name
+                description = 'BlueMap rendering for exact-pack Cobblemon Stone Statues using an operator-local hybrid pose-state catalog.'
+                url = 'https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://spdx.org/licenses/MIT.html'
+                        distribution = 'repo'
+                    }
+                    license {
+                        name = 'Mozilla Public License 2.0'
+                        url = 'https://spdx.org/licenses/MPL-2.0.html'
+                        distribution = 'repo'
+                    }
+                    license {
+                        name = 'GNU Lesser General Public License 2.1 only'
+                        url = 'https://spdx.org/licenses/LGPL-2.1-only.html'
+                        distribution = 'repo'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/jan-guenter/bluemap-cobblemonstonestatues-addon.git'
+                    url = 'https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'GitHubPackages'
+            url = uri(
+                    'https://maven.pkg.github.com/jan-guenter/'
+                            + 'bluemap-cobblemonstonestatues-addon'
+            )
+            credentials {
+                username = System.getenv('GITHUB_ACTOR')
+                password = System.getenv('GITHUB_TOKEN')
+            }
+        }
+    }
+}
+
+tasks.register('verifyPomLicenses') {
+    dependsOn tasks.named('generatePomFileForAddonPublication')
+    def pom = layout.buildDirectory.file('publications/addon/pom-default.xml')
+    inputs.file(pom)
+    doLast {
+        def parsed = new groovy.xml.XmlSlurper().parse(inputs.files.singleFile)
+        def names = parsed.licenses.license.name*.text() as Set
+        if (names != [
+                'MIT License', 'Mozilla Public License 2.0',
+                'GNU Lesser General Public License 2.1 only'
+        ] as Set
+                || parsed.scm.url.text()
+                != 'https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon') {
+            throw new GradleException('Published POM licensing/source metadata mismatch')
+        }
+    }
+}
+
+tasks.register('verifyPublicationMetadata') {
+    dependsOn tasks.named('generatePomFileForAddonPublication')
+    dependsOn tasks.named('generateMetadataFileForAddonPublication')
+    def pomFile = layout.buildDirectory.file('publications/addon/pom-default.xml')
+    def moduleFile = layout.buildDirectory.file('publications/addon/module.json')
+    inputs.files(pomFile, moduleFile)
+
+    doLast {
+        String pom = pomFile.get().asFile.getText('UTF-8')
+        for (String exact : [
+                "<groupId>${addon_group}</groupId>",
+                "<artifactId>${artifact_id}</artifactId>",
+                "<version>${project.version}</version>",
+                '<name>BlueMap Cobblemon Stone Statues Add-on</name>',
+                '<name>MIT License</name>',
+                '<name>Mozilla Public License 2.0</name>',
+                '<name>GNU Lesser General Public License 2.1 only</name>'
+        ]) {
+            if (!pom.contains(exact)) {
+                throw new GradleException("Publication POM is missing exact value: ${exact}")
+            }
+        }
+        def module = new groovy.json.JsonSlurper().parse(moduleFile.get().asFile)
+        if (module.component.group != addon_group
+                || module.component.module != artifact_id
+                || module.component.version != project.version.toString()) {
+            throw new GradleException('Gradle module coordinates changed')
+        }
+        def publishedFiles = module.variants.collectMany { it.files ?: [] }
+                .collect { it.name }.toSet()
+        if (publishedFiles != Set.of(
+                "${artifact_id}-${project.version}.jar",
+                "${artifact_id}-${project.version}-sources.jar"
+        )) {
+            throw new GradleException(
+                    "Gradle module payload roster changed: ${publishedFiles}"
+            )
+        }
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyPublicationMetadata')
+}

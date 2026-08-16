@@ -1,0 +1,590 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable v* tag to resume after a safe publication failure
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+  attestations: write
+  id-token: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+
+concurrency:
+  group: release-maven-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify tag, version, and main-branch identity
+        run: |
+          version="$(sed -n 's/^addon_version=//p' gradle.properties)"
+          exporter_version="$(sed -n 's/^mod_version=//p' \
+            tools/pose-exporter/gradle.properties)"
+          test -n "${version}"
+          test "${version}" = "${exporter_version}"
+          [[ "${version}" != *-SNAPSHOT ]]
+          [[ "${RELEASE_TAG}" =~ ^v[0-9A-Za-z][0-9A-Za-z.+-]*$ ]]
+          test "${RELEASE_TAG}" = "v${version}"
+          git fetch --force origin \
+            "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          test "$(git cat-file -t "refs/tags/${RELEASE_TAG}")" = tag
+          test "$(git rev-parse 'HEAD^{commit}')" = \
+            "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          echo "VERSION=${version}" >> "${GITHUB_ENV}"
+
+      - name: Require merged pull request and version introduction or increase
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          commit="$(git rev-parse HEAD)"
+          mapfile -t candidates < <(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/${GITHUB_REPOSITORY}/commits/${commit}/pulls" \
+            --jq ".[] | select(.merged_at != null and .base.ref == \"main\" and .merge_commit_sha == \"${commit}\") | [.number, .base.sha] | @tsv")
+          test "${#candidates[@]}" -gt 0
+
+          cat > "${RUNNER_TEMP}/verify-version-increase.py" <<'PY'
+          import re
+          import sys
+
+          pattern = re.compile(
+              r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+              r"(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$"
+          )
+
+
+          def parse(value):
+              match = pattern.fullmatch(value)
+              if match is None:
+                  raise ValueError(f"not semantic version: {value}")
+              core = tuple(int(item) for item in match.group(1, 2, 3))
+              pre = match.group(4)
+              if pre is None:
+                  return core, None
+              identifiers = []
+              for item in pre.split("."):
+                  if not item:
+                      raise ValueError(f"empty prerelease identifier: {value}")
+                  identifiers.append(int(item) if item.isdigit() else item)
+              return core, identifiers
+
+
+          def prerelease_greater(new, old):
+              if old is None:
+                  return False
+              if new is None:
+                  return True
+              for left, right in zip(new, old):
+                  if left == right:
+                      continue
+                  if isinstance(left, int) and isinstance(right, str):
+                      return False
+                  if isinstance(left, str) and isinstance(right, int):
+                      return True
+                  return left > right
+              return len(new) > len(old)
+
+
+          new_value, old_value, status = sys.argv[1:]
+          new_core, new_pre = parse(new_value)
+          if status == "added" and not old_value:
+              raise SystemExit(0)
+          old_core, old_pre = parse(old_value)
+          if new_core > old_core or (
+              new_core == old_core and prerelease_greater(new_pre, old_pre)
+          ):
+              raise SystemExit(0)
+          raise SystemExit(
+              f"addon_version did not increase: {old_value} -> {new_value}"
+          )
+          PY
+
+          reviewed_pr=''
+          for candidate in "${candidates[@]}"; do
+            IFS=$'\t' read -r number base_sha <<< "${candidate}"
+            status="$(gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/pulls/${number}/files" \
+              --jq '.[] | select(.filename == "gradle.properties") | .status' \
+              | head -n 1)"
+            if [[ "${status}" != added && "${status}" != modified ]]; then
+              continue
+            fi
+            old_version=''
+            if [[ "${status}" == modified ]]; then
+              old_version="$(git show "${base_sha}:gradle.properties" \
+                | sed -n 's/^addon_version=//p')"
+              test -n "${old_version}"
+            fi
+            if python3 "${RUNNER_TEMP}/verify-version-increase.py" \
+              "${VERSION}" "${old_version}" "${status}"; then
+              reviewed_pr="${number}"
+              break
+            fi
+          done
+          test -n "${reviewed_pr}"
+          echo "RELEASE_PR=${reviewed_pr}" >> "${GITHUB_ENV}"
+
+      - name: Check out exact BlueMap backport
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: jan-guenter/BlueMap
+          ref: 9be321df995a1103808621d529eb72773e719d4d
+          path: .ci/bluemap
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Set up Gradle 9.6.1
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          gradle-version: '9.6.1'
+
+      - name: Acquire exact ephemeral runtime inputs
+        run: |
+          input_dir="${RUNNER_TEMP}/stone-statues"
+          mkdir -p "${input_dir}"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "${input_dir}/cobblemonstonestatues-neoforge-1.1.jar" \
+            'https://cdn.modrinth.com/data/MTdmpNqd/versions/fjmqrivb/cobblemonstonestatues-neoforge-1.1.jar'
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "${input_dir}/Cobblemon-neoforge-1.7.3+1.21.1.jar" \
+            'https://cdn.modrinth.com/data/MdwFAVRL/versions/S1TrAn8c/Cobblemon-neoforge-1.7.3%2B1.21.1.jar'
+          (
+            cd "${input_dir}"
+            sha256sum --check <<'SHA256SUMS'
+          0fece8e5a988b660f2b608a316f88e2572290835fec1acf67d78329133e92f09  cobblemonstonestatues-neoforge-1.1.jar
+          962d75df4fb649d94863a7a7d130d4d2b3de4da9b3cae4c44b1ce90f37ec0ed5  Cobblemon-neoforge-1.7.3+1.21.1.jar
+          SHA256SUMS
+          )
+
+      - name: Build, test, and verify both release modules twice
+        run: |
+          input_dir="${RUNNER_TEMP}/stone-statues"
+          stone="${input_dir}/cobblemonstonestatues-neoforge-1.1.jar"
+          cobblemon="${input_dir}/Cobblemon-neoforge-1.7.3+1.21.1.jar"
+          build_all() {
+            python3 -m json.tool provenance/upstreams.json >/dev/null
+            python3 -m json.tool \
+              src/main/resources/bluemap-cobblemonstonestatues/profiles/exact-artifacts.json \
+              >/dev/null
+            (cd gallery && sha256sum --check SHA256SUMS)
+            gradle --no-daemon \
+              -PbluemapSourcePath=.ci/bluemap \
+              -PstoneStatuesJar="${stone}" \
+              -PcobblemonJar="${cobblemon}" \
+              clean check build generatePomFileForAddonPublication \
+              generateMetadataFileForAddonPublication verifyPinnedArtifacts \
+              verifyPublicationMetadata
+            gradle --no-daemon -p tools/pose-exporter \
+              -PstoneStatuesJar="${stone}" \
+              -PcobblemonJar="${cobblemon}" \
+              clean check build generatePomFileForExporterPublication \
+              generateMetadataFileForExporterPublication \
+              verifyPublicationMetadata
+          }
+          build_all
+          first="${RUNNER_TEMP}/first-build"
+          mkdir -p "${first}/addon" "${first}/exporter"
+          cp build/libs/*.jar "${first}/addon/"
+          cp build/publications/addon/pom-default.xml "${first}/addon/pom.xml"
+          cp build/publications/addon/module.json "${first}/addon/module.json"
+          cp tools/pose-exporter/build/libs/*.jar "${first}/exporter/"
+          cp tools/pose-exporter/build/publications/exporter/pom-default.xml \
+            "${first}/exporter/pom.xml"
+          cp tools/pose-exporter/build/publications/exporter/module.json \
+            "${first}/exporter/module.json"
+          build_all
+          cmp "${first}/addon/bluemap-cobblemonstonestatues-addon-${VERSION}.jar" \
+            "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar"
+          cmp "${first}/addon/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar" \
+            "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar"
+          cmp "${first}/addon/pom.xml" build/publications/addon/pom-default.xml
+          cmp "${first}/addon/module.json" build/publications/addon/module.json
+          cmp "${first}/exporter/atmons-stone-pose-exporter-${VERSION}.jar" \
+            "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar"
+          cmp "${first}/exporter/atmons-stone-pose-exporter-${VERSION}-sources.jar" \
+            "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar"
+          cmp "${first}/exporter/pom.xml" \
+            tools/pose-exporter/build/publications/exporter/pom-default.xml
+          cmp "${first}/exporter/module.json" \
+            tools/pose-exporter/build/publications/exporter/module.json
+
+          test "$(stat -c %s "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar")" \
+            -eq 286752
+          test "$(stat -c %s "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar")" \
+            -eq 118224
+          test "$(stat -c %s "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar")" \
+            -eq 284840
+          test "$(stat -c %s "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar")" \
+            -eq 103586
+          sha256sum --check <<SHA256SUMS
+          9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4  build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar
+          61d6d640792e88526998e5f2e4f8f3228acb8add360cb3b8de670e383d73d4ac  build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar
+          f35727ba2ce5c96abe085df36d5d02534b6a19e1f710eb4c145c0d7243c75b98  tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar
+          fc4a4c0808b006ec07c8a17965c800b2e612ac11e0ed755749824d3524c61dde  tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar
+          SHA256SUMS
+
+      - name: Prepare exact four-JAR release boundary
+        run: |
+          mkdir release
+          cp "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar" release/
+          cp "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar" release/
+          cp "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar" release/
+          cp "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar" release/
+          test "$(find release -maxdepth 1 -type f | wc -l)" -eq 4
+
+      - name: Inspect immutable Maven module versions
+        id: maven
+        env:
+          MAVEN_ACTOR: ${{ github.actor }}
+          MAVEN_TOKEN: ${{ github.token }}
+        run: |
+          cat > "${RUNNER_TEMP}/verify-maven.py" <<'PY'
+          import base64
+          import hashlib
+          import os
+          from pathlib import Path
+          import sys
+          import urllib.error
+          import urllib.request
+          import xml.etree.ElementTree as ET
+
+          version = os.environ["VERSION"]
+          actor = os.environ["MAVEN_ACTOR"]
+          token = os.environ["MAVEN_TOKEN"]
+          repository = (
+              "https://maven.pkg.github.com/jan-guenter/"
+              "bluemap-cobblemonstonestatues-addon"
+          )
+          packages = {
+              "addon": (
+                  f"{repository}/io/github/jan-guenter/"
+                  "bluemap-cobblemonstonestatues-addon",
+                  (
+                      (
+                          Path(
+                              "build/libs/"
+                              f"bluemap-cobblemonstonestatues-addon-{version}.jar"
+                          ),
+                          f"bluemap-cobblemonstonestatues-addon-{version}.jar",
+                      ),
+                      (
+                          Path(
+                              "build/libs/"
+                              f"bluemap-cobblemonstonestatues-addon-{version}-sources.jar"
+                          ),
+                          f"bluemap-cobblemonstonestatues-addon-{version}-sources.jar",
+                      ),
+                      (
+                          Path("build/publications/addon/pom-default.xml"),
+                          f"bluemap-cobblemonstonestatues-addon-{version}.pom",
+                      ),
+                      (
+                          Path("build/publications/addon/module.json"),
+                          f"bluemap-cobblemonstonestatues-addon-{version}.module",
+                      ),
+                  ),
+              ),
+              "exporter": (
+                  f"{repository}/io/github/janguenter/stoneposeexporter/"
+                  "atmons-stone-pose-exporter",
+                  (
+                      (
+                          Path(
+                              "tools/pose-exporter/build/libs/"
+                              f"atmons-stone-pose-exporter-{version}.jar"
+                          ),
+                          f"atmons-stone-pose-exporter-{version}.jar",
+                      ),
+                      (
+                          Path(
+                              "tools/pose-exporter/build/libs/"
+                              f"atmons-stone-pose-exporter-{version}-sources.jar"
+                          ),
+                          f"atmons-stone-pose-exporter-{version}-sources.jar",
+                      ),
+                      (
+                          Path(
+                              "tools/pose-exporter/build/publications/exporter/"
+                              "pom-default.xml"
+                          ),
+                          f"atmons-stone-pose-exporter-{version}.pom",
+                      ),
+                      (
+                          Path(
+                              "tools/pose-exporter/build/publications/exporter/"
+                              "module.json"
+                          ),
+                          f"atmons-stone-pose-exporter-{version}.module",
+                      ),
+                  ),
+              ),
+          }
+          package_name, requested = sys.argv[1:]
+          base, files = packages[package_name]
+          version_base = f"{base}/{version}"
+          authorization = base64.b64encode(
+              f"{actor}:{token}".encode("utf-8")
+          ).decode("ascii")
+
+
+          def fetch(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={"Authorization": f"Basic {authorization}"},
+              )
+              try:
+                  with urllib.request.urlopen(request) as response:
+                      return response.read()
+              except urllib.error.HTTPError as error:
+                  if error.code == 404:
+                      return None
+                  raise RuntimeError(
+                      f"GitHub Packages returned HTTP {error.code} for {url}"
+                  ) from error
+
+
+          def verify_sidecars(url, content, *, required):
+              for algorithm in ("sha1", "md5"):
+                  sidecar = fetch(f"{url}.{algorithm}")
+                  if sidecar is None:
+                      if required:
+                          raise RuntimeError(
+                              f"Missing {algorithm} sidecar for {url}"
+                          )
+                      continue
+                  if not required:
+                      raise RuntimeError(
+                          f"Orphaned {algorithm} sidecar for absent {url}"
+                      )
+                  expected = hashlib.new(algorithm, content).hexdigest()
+                  actual = sidecar.decode("ascii").strip().lower()
+                  if actual != expected:
+                      raise RuntimeError(
+                          f"Invalid {algorithm} sidecar for {url}"
+                      )
+
+
+          present = 0
+          missing = 0
+          for local_path, remote_name in files:
+              local = local_path.read_bytes()
+              remote_url = f"{version_base}/{remote_name}"
+              remote = fetch(remote_url)
+              if remote is None:
+                  verify_sidecars(remote_url, b"", required=False)
+                  missing += 1
+                  continue
+              if remote != local:
+                  raise RuntimeError(
+                      f"Published Maven bytes differ for {remote_name}"
+                  )
+              verify_sidecars(remote_url, remote, required=True)
+              present += 1
+
+          metadata_url = f"{base}/maven-metadata.xml"
+          metadata = fetch(metadata_url)
+          metadata_has_version = False
+          if metadata is not None:
+              verify_sidecars(metadata_url, metadata, required=True)
+              versions = [
+                  element.text
+                  for element in ET.fromstring(metadata).iter()
+                  if element.tag.rsplit("}", 1)[-1] == "version"
+              ]
+              count = versions.count(version)
+              if count > 1:
+                  raise RuntimeError("Duplicate version in Maven metadata")
+              metadata_has_version = count == 1
+          else:
+              verify_sidecars(metadata_url, b"", required=False)
+
+          if present == len(files) and missing == 0 and metadata_has_version:
+              observed = "present"
+          elif present == 0 and missing == len(files) and not metadata_has_version:
+              observed = "absent"
+          else:
+              raise RuntimeError(
+                  f"Immutable Maven module {package_name} is partial or inconsistent"
+              )
+
+          if requested == "inspect":
+              print(observed)
+          elif requested == "present" and observed != "present":
+              raise RuntimeError(f"Maven module {package_name} is not complete")
+          elif requested != "present":
+              raise RuntimeError(f"Unknown verification state: {requested}")
+          PY
+
+          addon_state="$(python3 "${RUNNER_TEMP}/verify-maven.py" addon inspect)"
+          exporter_state="$(python3 "${RUNNER_TEMP}/verify-maven.py" exporter inspect)"
+          case "${addon_state}" in
+            absent) echo 'publish_addon=true' >> "${GITHUB_OUTPUT}" ;;
+            present) echo 'publish_addon=false' >> "${GITHUB_OUTPUT}" ;;
+            *) exit 1 ;;
+          esac
+          case "${exporter_state}" in
+            absent) echo 'publish_exporter=true' >> "${GITHUB_OUTPUT}" ;;
+            present) echo 'publish_exporter=false' >> "${GITHUB_OUTPUT}" ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Create or refresh exact draft GitHub release
+        id: github_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes='Owner-accepted exact All the Mons 1.2.0 prerelease for Cobblemon Stone Statues 1.1, Cobblemon 1.7.3, and the Java 21 BlueMap 5.22 backport. Production activation requires a complete operator-local exact-client bundle and exact winning resources; the bundle and third-party assets are not distributed. This is not a generic compatibility or production-deployment claim.'
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            is_draft="$(gh release view "${RELEASE_TAG}" \
+              --json isDraft --jq '.isDraft')"
+            if [[ "${is_draft}" == true ]]; then
+              gh release edit "${RELEASE_TAG}" --draft --prerelease \
+                --title "BlueMap Cobblemon Stone Statues Add-on ${VERSION}" \
+                --notes "${notes}" --verify-tag
+              gh release upload "${RELEASE_TAG}" release/*.jar --clobber
+              echo 'already_published=false' >> "${GITHUB_OUTPUT}"
+            else
+              echo 'already_published=true' >> "${GITHUB_OUTPUT}"
+            fi
+          else
+            gh release create "${RELEASE_TAG}" release/*.jar \
+              --draft --prerelease \
+              --title "BlueMap Cobblemon Stone Statues Add-on ${VERSION}" \
+              --notes "${notes}" --verify-tag
+            echo 'already_published=false' >> "${GITHUB_OUTPUT}"
+          fi
+
+          expected=(
+            "atmons-stone-pose-exporter-${VERSION}-sources.jar"
+            "atmons-stone-pose-exporter-${VERSION}.jar"
+            "bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar"
+            "bluemap-cobblemonstonestatues-addon-${VERSION}.jar"
+          )
+          mapfile -t actual < <(gh release view "${RELEASE_TAG}" \
+            --json assets --jq '.assets[].name' | LC_ALL=C sort)
+          diff -u \
+            <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort) \
+            <(printf '%s\n' "${actual[@]}")
+          downloaded="${RUNNER_TEMP}/github-release-assets"
+          mkdir -p "${downloaded}"
+          gh release download "${RELEASE_TAG}" --dir "${downloaded}"
+          for asset in release/*.jar; do
+            cmp "${asset}" "${downloaded}/$(basename "${asset}")"
+          done
+
+      - name: Attest all four release JARs
+        if: steps.github_release.outputs.already_published != 'true'
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: release/*.jar
+
+      - name: Publish production Maven module
+        if: steps.maven.outputs.publish_addon == 'true'
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          input_dir="${RUNNER_TEMP}/stone-statues"
+          gradle --no-daemon \
+            -PbluemapSourcePath=.ci/bluemap \
+            -PstoneStatuesJar="${input_dir}/cobblemonstonestatues-neoforge-1.1.jar" \
+            -PcobblemonJar="${input_dir}/Cobblemon-neoforge-1.7.3+1.21.1.jar" \
+            verifyPublicationMetadata \
+            publishAddonPublicationToGitHubPackagesRepository
+
+      - name: Publish client-helper Maven module
+        if: steps.maven.outputs.publish_exporter == 'true'
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          input_dir="${RUNNER_TEMP}/stone-statues"
+          gradle --no-daemon -p tools/pose-exporter \
+            -PstoneStatuesJar="${input_dir}/cobblemonstonestatues-neoforge-1.1.jar" \
+            -PcobblemonJar="${input_dir}/Cobblemon-neoforge-1.7.3+1.21.1.jar" \
+            verifyPublicationMetadata \
+            publishExporterPublicationToGitHubPackagesRepository
+
+      - name: Verify both published Maven modules and sidecars
+        env:
+          MAVEN_ACTOR: ${{ github.actor }}
+          MAVEN_TOKEN: ${{ github.token }}
+        run: |
+          for package_name in addon exporter; do
+            for attempt in {1..12}; do
+              if python3 "${RUNNER_TEMP}/verify-maven.py" \
+                  "${package_name}" present; then
+                break
+              fi
+              if [[ "${attempt}" == 12 ]]; then
+                exit 1
+              fi
+              sleep 5
+            done
+          done
+
+      - name: Reverify and publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          expected=(
+            "atmons-stone-pose-exporter-${VERSION}-sources.jar"
+            "atmons-stone-pose-exporter-${VERSION}.jar"
+            "bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar"
+            "bluemap-cobblemonstonestatues-addon-${VERSION}.jar"
+          )
+          mapfile -t actual < <(gh release view "${RELEASE_TAG}" \
+            --json assets --jq '.assets[].name' | LC_ALL=C sort)
+          diff -u \
+            <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort) \
+            <(printf '%s\n' "${actual[@]}")
+          downloaded="${RUNNER_TEMP}/final-github-release-assets"
+          mkdir -p "${downloaded}"
+          gh release download "${RELEASE_TAG}" --dir "${downloaded}"
+          for asset in release/*.jar; do
+            cmp "${asset}" "${downloaded}/$(basename "${asset}")"
+          done
+
+          is_draft="$(gh release view "${RELEASE_TAG}" \
+            --json isDraft --jq '.isDraft')"
+          if [[ "${is_draft}" == true ]]; then
+            gh release edit "${RELEASE_TAG}" --draft=false --prerelease
+          else
+            test "$(gh release view "${RELEASE_TAG}" \
+              --json isPrerelease --jq '.isPrerelease')" = true
+          fi

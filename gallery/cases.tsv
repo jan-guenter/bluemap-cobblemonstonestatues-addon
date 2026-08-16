@@ -1,0 +1,9 @@
+index	id	kind	x	y	z	block	expected
+1	joltik-half-walking-stone-r0	valid	208	100	216	cobblemonstonestatues:pokemon_statue	rendered representative/control
+2	bulbasaur-normal-sleep-stone-r1	valid	216	100	216	cobblemonstonestatues:pokemon_statue	rendered representative/control
+3	pikachu-double-shoulder-left-gold-r3	valid	224	100	216	cobblemonstonestatues:pokemon_statue	rendered representative/control
+4	hisuian-decidueye-triple-fly-stone-r5	valid	232	100	216	cobblemonstonestatues:pokemon_statue	rendered representative/control
+5	stone-control	control	208	100	224	minecraft:stone	rendered representative/control
+6	gold-control	control	216	100	224	minecraft:gold_block	rendered representative/control
+7	orphan-statue-proxy	fallback	224	100	224	cobblemonstonestatues:statue_proxy	stock-invisible; production never owns proxy
+8	unknown-species-master	fallback	232	100	224	cobblemonstonestatues:pokemon_statue	stock-invisible; choice absent from attested export

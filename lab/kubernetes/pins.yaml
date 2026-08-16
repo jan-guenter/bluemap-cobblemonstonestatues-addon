@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bluemap-cobblemonstonestatues-staging-pins
+  namespace: bluemap-sophisticated-staging
+  labels:
+    app.kubernetes.io/part-of: bluemap-sophisticated-staging
+    app.kubernetes.io/component: cobblemon-stone-statues
+data:
+  server-archive-size: "1055896389"
+  server-archive-sha256: "de112ed8d79b3ff027e399a5108b706f6a2db3be74b15d0db6f6b9d6ac268e6c"
+  bluemap-size: "6467235"
+  bluemap-sha256: "749f7647fa29764cea113114a7ab3259271bab3da22720989f2bd9fd1f3ba150"
+  addon-size: "286752"
+  addon-sha256: "9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4"
+  gallery-size: "3153"
+  gallery-sha256: "1d8193b783eb1d30dd347896cc433e6de72549a472d800ff7484b16a17d04121"
+  pose-bundle-size: "99408820"
+  pose-bundle-sha256: "edc1b15d97267a28f9ef946a0c645e924b75322afb976aeeb220ad8c5056eefa"

@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'bluemap-cobblemonstonestatues-addon'
+
+def expectedBlueMapCommit = '9be321df995a1103808621d529eb72773e719d4d'
+def expectedBlueMapApiCommit = '285c9a60eff3ac2b0cab308ce1058d1565be0971'
+def blueMapSourcePath = providers.gradleProperty('bluemapSourcePath')
+        .getOrElse('../bluemap-backport')
+def blueMapSource = file(blueMapSourcePath)
+
+if (!blueMapSource.isDirectory()) {
+    throw new GradleException(
+            "BlueMap source checkout not found at ${blueMapSource}. "
+                    + 'Set -PbluemapSourcePath=<path> to the exact workspace backport.'
+    )
+}
+
+def gitOutput = { File repository, String... arguments ->
+    providers.exec {
+        commandLine(['git', '-C', repository.absolutePath] + arguments.toList())
+    }.standardOutput.asText.get().trim()
+}
+
+def blueMapHead = gitOutput(blueMapSource, 'rev-parse', 'HEAD')
+if (blueMapHead != expectedBlueMapCommit) {
+    throw new GradleException("Refusing BlueMap ${blueMapHead}; expected ${expectedBlueMapCommit}")
+}
+def blueMapApiSource = new File(blueMapSource, 'api')
+def blueMapApiHead = gitOutput(blueMapApiSource, 'rev-parse', 'HEAD')
+if (blueMapApiHead != expectedBlueMapApiCommit) {
+    throw new GradleException(
+            "Refusing BlueMapAPI ${blueMapApiHead}; expected ${expectedBlueMapApiCommit}"
+    )
+}
+
+includeBuild(blueMapSource) {
+    dependencySubstitution {
+        substitute module('de.bluecolored:bluemap-core') using project(':core')
+    }
+}
