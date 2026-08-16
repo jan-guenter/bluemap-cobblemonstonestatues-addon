@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Check out add-on
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out exact BlueMap backport
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: jan-guenter/BlueMap
+          ref: 9be321df995a1103808621d529eb72773e719d4d
+          path: .ci/bluemap
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Set up Gradle 9.6.1
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          gradle-version: '9.6.1'
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Acquire exact ephemeral runtime inputs
+        run: |
+          input_dir="${RUNNER_TEMP}/stone-statues"
+          mkdir -p "${input_dir}"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "${input_dir}/cobblemonstonestatues-neoforge-1.1.jar" \
+            "https://cdn.modrinth.com/data/MTdmpNqd/versions/fjmqrivb/cobblemonstonestatues-neoforge-1.1.jar"
+          curl --fail --location --retry 3 --retry-all-errors \
+            --output "${input_dir}/Cobblemon-neoforge-1.7.3+1.21.1.jar" \
+            "https://cdn.modrinth.com/data/MdwFAVRL/versions/S1TrAn8c/Cobblemon-neoforge-1.7.3%2B1.21.1.jar"
+
+      - name: Run authoritative production and exporter gates
+        run: |
+          input_dir="${RUNNER_TEMP}/stone-statues"
+          stone="${input_dir}/cobblemonstonestatues-neoforge-1.1.jar"
+          cobblemon="${input_dir}/Cobblemon-neoforge-1.7.3+1.21.1.jar"
+          python3 -m json.tool provenance/upstreams.json >/dev/null
+          python3 -m json.tool \
+            src/main/resources/bluemap-cobblemonstonestatues/profiles/exact-artifacts.json \
+            >/dev/null
+          (cd gallery && sha256sum --check SHA256SUMS)
+          gradle --no-daemon \
+            -PbluemapSourcePath=.ci/bluemap \
+            -PstoneStatuesJar="${stone}" \
+            -PcobblemonJar="${cobblemon}" \
+            clean check build generatePomFileForAddonPublication \
+            generateMetadataFileForAddonPublication verifyPinnedArtifacts
+          gradle --no-daemon -p tools/pose-exporter \
+            -PstoneStatuesJar="${stone}" \
+            -PcobblemonJar="${cobblemon}" \
+            clean check build
+
+      - name: Upload review outputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bluemap-cobblemonstonestatues-${{ github.sha }}
+          path: |
+            build/libs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar
+            build/libs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1-sources.jar
+            tools/pose-exporter/build/libs/atmons-stone-pose-exporter-0.1.0-alpha.1.jar
+            tools/pose-exporter/build/libs/atmons-stone-pose-exporter-0.1.0-alpha.1-sources.jar
+            build/publications/addon/pom-default.xml
+            tools/pose-exporter/build/publications/exporter/pom-default.xml
+            build/publications/addon/module.json
+            build/reports/**
+            tools/pose-exporter/build/reports/**
+          if-no-files-found: error
+          retention-days: 14

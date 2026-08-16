@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "all_the_mons": {
+    "version": "1.2.0",
+    "commit": "c7bb230f21d14d26859d0b92548f089b3a493ad9",
+    "minecraft": "1.21.1",
+    "neoforge": "21.1.248"
+  },
+  "bluemap": {
+    "version": "5.22-agent.backport-5.22-mc1.21.1-2",
+    "commit": "9be321df995a1103808621d529eb72773e719d4d",
+    "api_commit": "285c9a60eff3ac2b0cab308ce1058d1565be0971",
+    "jar_sha256": "749f7647fa29764cea113114a7ab3259271bab3da22720989f2bd9fd1f3ba150",
+    "license": "MIT"
+  },
+  "first_party_adapter_framework": {
+    "project": "bluemap-botanypots-addon",
+    "version": "0.1.0-alpha.1",
+    "tag": "v0.1.0-alpha.1",
+    "commit": "f40eed6c1f7f30356bcdfabbc3e2a6455fec7884",
+    "license": "LGPL-2.1-only",
+    "license_text_sha256": "c8c96cd98c4c36e7dc348a56405fbc98eab2ca80f6e9e98a11958015908e9ac1"
+  },
+  "cleanroom_box_replay": {
+    "spec_sha256": "37cd94a5d6dd4068da9056dfd52fdeca37d0dff87d214179f5eebb03e62f2512",
+    "fixture_sha256": "b287b9ff5b6bdd0aa9d7bf04865a1d9bb28f772e59b10333c224ea552fbc848f",
+    "fixture_cases": 13,
+    "license": "MIT"
+  },
+  "joml": {
+    "version": "1.10.5",
+    "implementation_build": "82538cc2678d60e5716292e0a58ff8dec7cc8cec",
+    "jar_sha256": "cac9f22f83a7aa33eebda73c16ff5261e3cb4911b6bafcf4c79ea486099d0c9a",
+    "license": "MIT",
+    "deployment": "minecraft-host-runtime"
+  },
+  "stone_statues": {
+    "version": "1.1",
+    "size": 170977,
+    "sha256": "0fece8e5a988b660f2b608a316f88e2572290835fec1acf67d78329133e92f09"
+  },
+  "cobblemon": {
+    "version": "1.7.3+1.21.1",
+    "size": 128748941,
+    "sha256": "962d75df4fb649d94863a7a7d130d4d2b3de4da9b3cae4c44b1ce90f37ec0ed5",
+    "embedded_commit": "37264aff0f6c90c9f9a79bbdfc712bd11929a38c",
+    "included_modification": {
+      "project_file": "src/main/java/io/github/janguenter/bluemap/cobblemonstonestatues/geometry/BakedGeometryTopology.java",
+      "upstream_file": "common/src/main/kotlin/com/cobblemon/mod/common/client/render/models/blockbench/TexturedModel.kt",
+      "license": "MPL-2.0",
+      "copyright": "Copyright (C) 2023 Cobblemon Contributors",
+      "modification": "Validated order-neutral topology and captured-state binding",
+      "license_text_sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    }
+  }
+}

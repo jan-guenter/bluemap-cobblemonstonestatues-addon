@@ -1,0 +1,736 @@
+// SPDX-License-Identifier: MIT
+
+plugins {
+    id 'java-library'
+    id 'checkstyle'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.140'
+}
+
+group = mod_group_id
+version = mod_version
+
+base {
+    archivesName = artifact_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+sourceSets.named('main').configure {
+    java {
+        srcDir '../../src/main/java'
+        include 'io/github/janguenter/stoneposeexporter/**'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/pose/PoseState.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/pose/PoseStateCodec.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/FormatTwoBudgets.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/BedrockGeometry.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/BedrockGeometryParser.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/BakedGeometryTopology.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/GeometryTopologyDigest.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/QuadMultisetDigest.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/CleanRoomGeometryCompiler.java'
+        include 'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/cleanroom/**'
+    }
+}
+
+sourceSets.named('test').configure {
+    java {
+        srcDir '../../src/test/java'
+        include 'io/github/janguenter/stoneposeexporter/**'
+        include('io/github/janguenter/bluemap/cobblemonstonestatues/geometry/cleanroom/'
+                + 'BedrockBoxReplayTest.java')
+        include('io/github/janguenter/bluemap/cobblemonstonestatues/geometry/cleanroom/'
+                + 'RuntimeFixtureParityTest.java')
+        include('io/github/janguenter/bluemap/cobblemonstonestatues/geometry/cleanroom/'
+                + 'CleanRoomReplayJUnitTest.java')
+    }
+    // The runtime-parity test deliberately compiles against the exact mapped Minecraft API.
+    compileClasspath += sourceSets.main.compileClasspath
+    runtimeClasspath += sourceSets.main.compileClasspath
+}
+
+neoForge {
+    version = neoforge_version
+    mods {
+        atmons_stone_pose_exporter {
+            sourceSet sourceSets.main
+        }
+    }
+    runs {
+        client {
+            client()
+            gameDirectory = project.file('run/client')
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = uri('https://thedarkcolour.github.io/KotlinForForge/')
+        content { includeGroup('thedarkcolour') }
+    }
+}
+
+def stoneJar = providers.gradleProperty('stoneStatuesJar').map { file(it) }
+def cobblemonJar = providers.gradleProperty('cobblemonJar').map { file(it) }
+def exactCompileOnlyArtifacts = [
+        [
+                label: 'Stone Statues 1.1',
+                source: stoneJar,
+                size: 170977L,
+                sha256: '0fece8e5a988b660f2b608a316f88e2572290835fec1acf67d78329133e92f09'
+        ],
+        [
+                label: 'Cobblemon 1.7.3+1.21.1',
+                source: cobblemonJar,
+                size: 128748941L,
+                sha256: '962d75df4fb649d94863a7a7d130d4d2b3de4da9b3cae4c44b1ce90f37ec0ed5'
+        ]
+]
+
+dependencies {
+    compileOnly files(stoneJar)
+    compileOnly files(cobblemonJar)
+    compileOnly 'thedarkcolour:kotlinforforge-neoforge:5.12.0'
+    compileOnly 'org.joml:joml:1.10.5'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'com.google.code.gson:gson:2.11.0'
+    testImplementation 'org.joml:joml:1.10.5'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+configurations.named('testCompileOnly').configure {
+    extendsFrom configurations.named('compileOnly').get()
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    systemProperty 'stoneRuntimeFixture', providers.gradleProperty('stoneRuntimeFixture')
+            .getOrElse(file(
+                    '../../provenance/cleanroom/stone-box-replay/fixtures.ndjson'
+            ).absolutePath)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+}
+
+tasks.register('verifyExactCompileOnlyArtifacts') {
+    inputs.files(exactCompileOnlyArtifacts.collect { it.source })
+    doLast {
+        exactCompileOnlyArtifacts.each { identity ->
+            File candidate = identity.source.get()
+            if (!candidate.isFile() || candidate.length() != identity.size) {
+                throw new GradleException(
+                        "${identity.label} exact compile-only size mismatch: ${candidate}"
+                )
+            }
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            candidate.withInputStream { input ->
+                byte[] buffer = new byte[64 * 1024]
+                int read
+                while ((read = input.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            def actual = java.util.HexFormat.of().formatHex(digest.digest())
+            if (actual != identity.sha256) {
+                throw new GradleException(
+                        "${identity.label} exact compile-only SHA-256 mismatch: ${candidate}"
+                )
+            }
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn tasks.named('verifyExactCompileOnlyArtifacts')
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def values = [mod_id: mod_id, mod_name: mod_name, mod_version: mod_version]
+    inputs.properties(values)
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand(values)
+    }
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+    includeEmptyDirs = false
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes(
+                'Implementation-Title': mod_name,
+                'Implementation-Version': project.version.toString()
+        )
+    }
+    from('../../LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-atmons-stone-pose-exporter' }
+    }
+    from('../../LICENSES/MPL-2.0.txt') {
+        into 'META-INF/licenses'
+    }
+    from('../../LICENSES.md') {
+        into 'META-INF'
+        rename { 'LICENSES-atmons-stone-pose-exporter.md' }
+    }
+    from('../../NOTICE.md') {
+        into 'META-INF'
+        rename { 'NOTICE-atmons-stone-pose-exporter.md' }
+    }
+    from('../../SOURCE-OFFER.md') {
+        into 'META-INF'
+        rename { 'SOURCE-OFFER-atmons-stone-pose-exporter.md' }
+    }
+    from('THIRD_PARTY.md') {
+        into 'META-INF'
+        rename { 'THIRD_PARTY-atmons-stone-pose-exporter.md' }
+    }
+    from('../../provenance/upstreams.json') {
+        into 'META-INF/atmons-stone-pose-exporter'
+    }
+}
+
+tasks.named('sourcesJar', Jar).configure {
+    manifest {
+        attributes(
+                'Implementation-Title': mod_name + ' sources',
+                'Implementation-Version': project.version.toString()
+        )
+    }
+    from('../../LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-atmons-stone-pose-exporter' }
+    }
+    from('../../LICENSES/MPL-2.0.txt') {
+        into 'META-INF/licenses'
+    }
+    from('../../LICENSES.md') {
+        into 'META-INF'
+        rename { 'LICENSES-atmons-stone-pose-exporter.md' }
+    }
+    from('../../NOTICE.md') {
+        into 'META-INF'
+        rename { 'NOTICE-atmons-stone-pose-exporter.md' }
+    }
+    from('../../SOURCE-OFFER.md') {
+        into 'META-INF'
+        rename { 'SOURCE-OFFER-atmons-stone-pose-exporter.md' }
+    }
+    from('THIRD_PARTY.md') {
+        into 'META-INF'
+        rename { 'THIRD_PARTY-atmons-stone-pose-exporter.md' }
+    }
+    from('../../provenance/upstreams.json') {
+        into 'META-INF/atmons-stone-pose-exporter'
+    }
+    from('../../provenance/cleanroom/stone-box-replay') {
+        include 'README.md', 'SPEC.md'
+        into 'META-INF/atmons-stone-pose-exporter/cleanroom/stone-box-replay'
+    }
+}
+
+checkstyle {
+    toolVersion = '10.18.2'
+    configFile = file('../../config/checkstyle/checkstyle.xml')
+}
+
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+def productionJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+def retiredFormatOneEntry = { String path ->
+    path.contains('MeshCodec')
+            || path == 'pose-catalog.json'
+            || path.endsWith('/pose-catalog.json')
+            || path.startsWith('meshes/')
+            || path.contains('/meshes/')
+}
+def retiredFormatOneProbes = [
+        'io/example/MeshCodec.class',
+        'io/example/MeshCodec$Header.class',
+        'io/example/MeshCodec.java',
+        'meshes/legacy.bin',
+        'nested/meshes/legacy.bin',
+        'pose-catalog.json',
+        'nested/pose-catalog.json'
+]
+def hasUnexpandedMetadata = { String text -> text.contains('${') }
+def acceptedHelperNoticeSha256 =
+        '71b7545cda2a26fc2f3edffec9430e27a1da4d6d84373aaa248d02b7b719a20e'
+def unexpandedMetadataProbes = [
+        'version = "${mod_version}"',
+        'modId = "${mod_id}"',
+        'displayName = "${mod_name}"'
+]
+
+tasks.register('verifyProductionJar') {
+    dependsOn tasks.named('jar')
+    inputs.file(productionJar)
+    doLast {
+        if (!retiredFormatOneProbes.every(retiredFormatOneEntry)) {
+            throw new GradleException('Retired format-1 exporter guard is incomplete')
+        }
+        if (!unexpandedMetadataProbes.every(hasUnexpandedMetadata)) {
+            throw new GradleException('Unexpanded exporter metadata guard is incomplete')
+        }
+        new java.util.zip.ZipFile(inputs.files.singleFile).withCloseable { zip ->
+            def entries = zip.entries().findAll { !it.directory }.collect { it.name }
+            def required = [
+                    'META-INF/neoforge.mods.toml',
+                    'META-INF/LICENSE-atmons-stone-pose-exporter',
+                    'META-INF/licenses/MPL-2.0.txt',
+                    'META-INF/LICENSES-atmons-stone-pose-exporter.md',
+                    'META-INF/NOTICE-atmons-stone-pose-exporter.md',
+                    'META-INF/SOURCE-OFFER-atmons-stone-pose-exporter.md',
+                    'META-INF/THIRD_PARTY-atmons-stone-pose-exporter.md',
+                    'META-INF/atmons-stone-pose-exporter/upstreams.json',
+                    'atmons_stone_pose_exporter.mixins.json',
+                    'io/github/janguenter/stoneposeexporter/StonePoseExporterMod.class',
+                    'io/github/janguenter/stoneposeexporter/PoseCaptureHook.class',
+                    'io/github/janguenter/stoneposeexporter/ModelBindingObserverCore.class',
+                    'io/github/janguenter/stoneposeexporter/ModelResourceBindings.class',
+                    'io/github/janguenter/stoneposeexporter/ResourceAdmissionBudget.class',
+                    'io/github/janguenter/stoneposeexporter/mixin/PosableModelCaptureMixin.class',
+                    'io/github/janguenter/stoneposeexporter/mixin/'
+                            + 'VaryingModelRepositoryResourceMixin.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/PoseState.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState$RuntimeFrame.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState$MirrorZeroXNormals.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/PoseStateCodec.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/'
+                            + 'FormatTwoBudgets.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'BakedGeometryTopology.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'QuadMultisetDigest.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'CleanRoomGeometryCompiler.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/BedrockBoxReplay.class',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/JomlAdapters.class'
+            ]
+            def missing = required.findAll { !entries.contains(it) }
+            def foreignClasses = entries.findAll {
+                it.endsWith('.class')
+                        && !it.startsWith('io/github/janguenter/stoneposeexporter/')
+                        && !it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                )
+                        && !it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                )
+                        && !it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/'
+                )
+            }
+            def forbidden = entries.findAll {
+                it.endsWith('.jar') || it.endsWith('.png') || it.endsWith('.geo.json')
+                        || it.endsWith('.ndjson') || it.endsWith('LGPL-2.1-only.txt')
+                        || it.endsWith('.animation.json')
+                        || it.startsWith('assets/cobblemon/')
+                        || it.startsWith('assets/cobblemonstonestatues/')
+                        || it.startsWith('com/cobblemon/')
+                        || it.startsWith('com/jorgaomc/')
+                        || it.startsWith('net/minecraft/')
+                        || it.startsWith('net/neoforged/')
+                        || it.startsWith('kotlin/')
+                        || retiredFormatOneEntry(it)
+                        || it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                                + 'GeometryReplayCompiler'
+                )
+                        || it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                                + 'GeometryMeshCompiler'
+                )
+            }
+            if (!missing.isEmpty() || !forbidden.isEmpty() || !foreignClasses.isEmpty()) {
+                throw new GradleException(
+                        "Exporter JAR boundary mismatch: missing=${missing}, "
+                                + "forbidden=${forbidden}, foreignClasses=${foreignClasses}"
+                )
+            }
+            def upstreams = new groovy.json.JsonSlurper().parseText(
+                    zip.getInputStream(zip.getEntry(
+                            'META-INF/atmons-stone-pose-exporter/upstreams.json'
+                    )).getText('UTF-8')
+            )
+            if (upstreams.bluemap.license != 'MIT'
+                    || upstreams.cleanroom_box_replay.fixture_sha256
+                    != 'b287b9ff5b6bdd0aa9d7bf04865a1d9bb28f772e59b10333c224ea552fbc848f') {
+                throw new GradleException('Exporter packaged provenance drifted')
+            }
+            def mplSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/licenses/MPL-2.0.txt'
+                            )).bytes
+                    )
+            )
+            if (mplSha != '1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5') {
+                throw new GradleException('Exporter MPL-2.0 license text drifted')
+            }
+            def noticeSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/THIRD_PARTY-atmons-stone-pose-exporter.md'
+                            )).bytes
+                    )
+            )
+            if (noticeSha != acceptedHelperNoticeSha256) {
+                throw new GradleException('Exporter artifact-time notice drifted')
+            }
+            def resourceMixin = new String(zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/stoneposeexporter/mixin/'
+                            + 'VaryingModelRepositoryResourceMixin.class'
+            )).bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+            if (!resourceMixin.contains('Ljava/io/InputStream;readAllBytes()[B')
+                    || resourceMixin.contains('Ljava/io/InputStream;readAllBytes:()[B')) {
+                throw new GradleException('Exporter exact-byte Mixin selector drifted')
+            }
+            def controllerClass = new String(zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/stoneposeexporter/StonePoseExportController.class'
+            )).bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+            def engineClass = new String(zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/stoneposeexporter/StonePoseExportEngine.class'
+            )).bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
+            if (!engineClass.contains(
+                    '(Ljava/io/InputStream;)Lcom/mojang/blaze3d/platform/NativeImage;'
+            ) || engineClass.contains(
+                    '([B)Lcom/mojang/blaze3d/platform/NativeImage;'
+            )) {
+                throw new GradleException('Exporter PNG decode path is not streaming')
+            }
+            if (controllerClass.contains(
+                    'Hybrid pose-state export is not wired; this development build is inactive.'
+            )
+                    || !controllerClass.contains(
+                    'Stone pose export started on the render thread.'
+            )
+                    || !controllerClass.contains('StonePoseExportEngine')
+                    || !controllerClass.contains('Stone pose export is already running.')
+                    || !controllerClass.contains(
+                    'Resources are reloading; wait and retry.'
+            )) {
+                throw new GradleException('Exporter enabled command bytecode drifted')
+            }
+            def metadata = zip.getInputStream(zip.getEntry('META-INF/neoforge.mods.toml'))
+                    .getText('UTF-8')
+            def manifest = new java.util.jar.Manifest(zip.getInputStream(
+                    zip.getEntry('META-INF/MANIFEST.MF')
+            )).mainAttributes
+            def expectedName = "${artifact_id}-${project.version}.jar"
+            if (hasUnexpandedMetadata(metadata)
+                    || metadata.count("modId = \"${mod_id}\"") != 1
+                    || metadata.count("version = \"${project.version}\"") != 1
+                    || metadata.count("displayName = \"${mod_name}\"") != 1
+                    || metadata.count("[[dependencies.${mod_id}]]") != 4
+                    || inputs.files.singleFile.name != expectedName
+                    || manifest.getValue('Implementation-Version')
+                    != project.version.toString()
+                    || metadata.count('side = "CLIENT"') != 4
+                    || !metadata.contains('license = "MIT AND MPL-2.0"')
+                    || metadata.contains('side = "SERVER"')
+                    || metadata.contains('side = "BOTH"')
+                    || metadata.count('[[mixins]]') != 1
+                    || metadata.count(
+                    'config = "atmons_stone_pose_exporter.mixins.json"'
+            ) != 1) {
+                throw new GradleException('Exporter metadata is not strictly client-only')
+            }
+            def mixins = new groovy.json.JsonSlurper().parseText(
+                    zip.getInputStream(zip.getEntry(
+                            'atmons_stone_pose_exporter.mixins.json'
+                    )).getText('UTF-8')
+            )
+            if (mixins.required != true
+                    || mixins.minVersion != '0.8.7'
+                    || mixins.compatibilityLevel != 'JAVA_21'
+                    || mixins.package != 'io.github.janguenter.stoneposeexporter.mixin'
+                    || mixins.client != [
+                    'PosableModelCaptureMixin', 'VaryingModelRepositoryResourceMixin'
+            ]
+                    || mixins.mixins != null || mixins.server != null
+                    || mixins.injectors?.defaultRequire != 1) {
+                throw new GradleException('Exporter Mixin configuration is not client-only')
+            }
+        }
+    }
+}
+
+def exporterSourcesJar = tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
+
+tasks.register('verifySourcesJar') {
+    dependsOn tasks.named('sourcesJar')
+    inputs.file(exporterSourcesJar)
+    doLast {
+        if (!retiredFormatOneProbes.every(retiredFormatOneEntry)) {
+            throw new GradleException('Retired format-1 exporter sources guard is incomplete')
+        }
+        new java.util.zip.ZipFile(inputs.files.singleFile).withCloseable { zip ->
+            def entries = zip.entries().findAll { !it.directory }.collect { it.name }
+            def required = [
+                    'META-INF/LICENSE-atmons-stone-pose-exporter',
+                    'META-INF/licenses/MPL-2.0.txt',
+                    'META-INF/LICENSES-atmons-stone-pose-exporter.md',
+                    'META-INF/NOTICE-atmons-stone-pose-exporter.md',
+                    'META-INF/SOURCE-OFFER-atmons-stone-pose-exporter.md',
+                    'META-INF/THIRD_PARTY-atmons-stone-pose-exporter.md',
+                    'META-INF/atmons-stone-pose-exporter/upstreams.json',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseStateCodec.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'BakedGeometryTopology.java',
+                    'io/github/janguenter/stoneposeexporter/ResourceAdmissionBudget.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/'
+                            + 'FormatTwoBudgets.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'CleanRoomGeometryCompiler.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/BedrockBoxReplay.java',
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/JomlAdapters.java',
+                    'META-INF/atmons-stone-pose-exporter/cleanroom/'
+                            + 'stone-box-replay/README.md',
+                    'META-INF/atmons-stone-pose-exporter/cleanroom/'
+                            + 'stone-box-replay/SPEC.md'
+            ]
+            def missing = required.findAll { !entries.contains(it) }
+            def foreignJava = entries.findAll {
+                it.endsWith('.java')
+                        && !it.startsWith('io/github/janguenter/stoneposeexporter/')
+                        && !it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                )
+                        && !it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                )
+                        && !it.startsWith(
+                        'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/'
+                )
+            }
+            def forbidden = entries.findAll {
+                it.endsWith('.class') || it.endsWith('.jar') || it.endsWith('.png')
+                        || it.endsWith('.ndjson') || it.endsWith('LGPL-2.1-only.txt')
+                        || it.endsWith('.geo.json') || it.endsWith('.animation.json')
+                        || it.startsWith('assets/cobblemon/')
+                        || retiredFormatOneEntry(it)
+                        || it.contains('GeometryReplayCompiler')
+                        || it.contains('GeometryMeshCompiler')
+            }
+            def coveredSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'BakedGeometryTopology.java'
+            )).getText('UTF-8')
+            def cleanRoomSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
+                            + 'cleanroom/BedrockBoxReplay.java'
+            )).getText('UTF-8')
+            def poseStateSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseState.java'
+            )).getText('UTF-8')
+            def poseStateCodecSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/bluemap/cobblemonstonestatues/pose/'
+                            + 'PoseStateCodec.java'
+            )).getText('UTF-8')
+            def engineSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/stoneposeexporter/StonePoseExportEngine.java'
+            )).getText('UTF-8')
+            def bindingSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/stoneposeexporter/ModelResourceBindings.java'
+            )).getText('UTF-8')
+            def controllerSource = zip.getInputStream(zip.getEntry(
+                    'io/github/janguenter/stoneposeexporter/StonePoseExportController.java'
+            )).getText('UTF-8')
+            def specSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/atmons-stone-pose-exporter/cleanroom/'
+                                            + 'stone-box-replay/SPEC.md'
+                            )).bytes
+                    )
+            )
+            def noticeSha = java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance('SHA-256').digest(
+                            zip.getInputStream(zip.getEntry(
+                                    'META-INF/THIRD_PARTY-atmons-stone-pose-exporter.md'
+                            )).bytes
+                    )
+            )
+            def manifest = new java.util.jar.Manifest(zip.getInputStream(
+                    zip.getEntry('META-INF/MANIFEST.MF')
+            )).mainAttributes
+            def expectedName = "${artifact_id}-${project.version}-sources.jar"
+            if (!missing.isEmpty() || !foreignJava.isEmpty() || !forbidden.isEmpty()
+                    || !coveredSource.contains('SPDX-License-Identifier: MPL-2.0')
+                    || !coveredSource.contains(
+                    '37264aff0f6c90c9f9a79bbdfc712bd11929a38c'
+            )
+                    || !cleanRoomSource.contains('SPDX-License-Identifier: MIT')
+                    || !cleanRoomSource.contains(
+                    'b287b9ff5b6bdd0aa9d7bf04865a1d9bb28f772e59b10333c224ea552fbc848f'
+            )
+                    || !poseStateSource.contains('record MirrorZeroXNormals(')
+                    || !poseStateCodecSource.contains('MAGIC = 0x34535441')
+                    || !poseStateCodecSource.contains('public static final int VERSION = 4;')
+                    || !poseStateCodecSource.contains('FRAME_FLOATS = 46;')
+                    || engineSource.contains('MAX_TEXTURE_BYTES')
+                    || engineSource.contains('MAX_RETAINED_GEO_BYTES')
+                    || !engineSource.contains(
+                    'NativeImage.read(new ByteArrayInputStream(raw))'
+            )
+                    || engineSource.contains('NativeImage.read(raw)')
+                    || bindingSource.contains('512L * 1024L * 1024L')
+                    || bindingSource.contains('64 * 1024 * 1024')
+                    || !controllerSource.contains('HYBRID_EXPORT_READY = true')
+                    || controllerSource.contains('HYBRID_EXPORT_READY = false')
+                    || noticeSha != acceptedHelperNoticeSha256
+                    || specSha != '37cd94a5d6dd4068da9056dfd52fdeca37d0dff87d214179f5eebb03e62f2512'
+                    || inputs.files.singleFile.name != expectedName
+                    || manifest.getValue('Implementation-Version')
+                    != project.version.toString()) {
+                throw new GradleException(
+                        "Exporter sources boundary mismatch: missing=${missing}, "
+                                + "foreignJava=${foreignJava}, forbidden=${forbidden}"
+                )
+            }
+        }
+    }
+}
+
+publishing {
+    publications {
+        exporter(MavenPublication) {
+            from components.java
+            artifactId = artifact_id
+            pom {
+                name = mod_name
+                description = 'Client-only operator-local hybrid pose-state exporter.'
+                url = 'https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://spdx.org/licenses/MIT.html'
+                        distribution = 'repo'
+                    }
+                    license {
+                        name = 'Mozilla Public License 2.0'
+                        url = 'https://spdx.org/licenses/MPL-2.0.html'
+                        distribution = 'repo'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/jan-guenter/bluemap-cobblemonstonestatues-addon.git'
+                    url = 'https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'GitHubPackages'
+            url = uri(
+                    'https://maven.pkg.github.com/jan-guenter/'
+                            + 'bluemap-cobblemonstonestatues-addon'
+            )
+            credentials {
+                username = System.getenv('GITHUB_ACTOR')
+                password = System.getenv('GITHUB_TOKEN')
+            }
+        }
+    }
+}
+
+tasks.register('verifyPomLicenses') {
+    dependsOn tasks.named('generatePomFileForExporterPublication')
+    def pom = layout.buildDirectory.file('publications/exporter/pom-default.xml')
+    inputs.file(pom)
+    doLast {
+        def parsed = new groovy.xml.XmlSlurper().parse(inputs.files.singleFile)
+        def names = parsed.licenses.license.name*.text() as Set
+        if (names != ['MIT License', 'Mozilla Public License 2.0'] as Set
+                || parsed.scm.url.text()
+                != 'https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon') {
+            throw new GradleException('Exporter POM licensing/source metadata mismatch')
+        }
+    }
+}
+
+tasks.register('verifyPublicationMetadata') {
+    dependsOn tasks.named('generatePomFileForExporterPublication')
+    dependsOn tasks.named('generateMetadataFileForExporterPublication')
+    def pomFile = layout.buildDirectory.file('publications/exporter/pom-default.xml')
+    def moduleFile = layout.buildDirectory.file('publications/exporter/module.json')
+    inputs.files(pomFile, moduleFile)
+
+    doLast {
+        String pom = pomFile.get().asFile.getText('UTF-8')
+        for (String exact : [
+                "<groupId>${mod_group_id}</groupId>",
+                "<artifactId>${artifact_id}</artifactId>",
+                "<version>${project.version}</version>",
+                '<name>ATMons Stone Pose Exporter</name>',
+                '<name>MIT License</name>',
+                '<name>Mozilla Public License 2.0</name>'
+        ]) {
+            if (!pom.contains(exact)) {
+                throw new GradleException(
+                        "Exporter publication POM is missing exact value: ${exact}"
+                )
+            }
+        }
+        def module = new groovy.json.JsonSlurper().parse(moduleFile.get().asFile)
+        if (module.component.group != mod_group_id
+                || module.component.module != artifact_id
+                || module.component.version != project.version.toString()) {
+            throw new GradleException('Exporter Gradle module coordinates changed')
+        }
+        def publishedFiles = module.variants.collectMany { it.files ?: [] }
+                .collect { it.name }.toSet()
+        if (publishedFiles != Set.of(
+                "${artifact_id}-${project.version}.jar",
+                "${artifact_id}-${project.version}-sources.jar"
+        )) {
+            throw new GradleException(
+                    "Exporter Gradle module payload roster changed: ${publishedFiles}"
+            )
+        }
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyExactCompileOnlyArtifacts')
+    dependsOn tasks.named('verifyProductionJar')
+    dependsOn tasks.named('verifySourcesJar')
+    dependsOn 'verifyPomLicenses'
+    dependsOn tasks.named('verifyPublicationMetadata')
+}
+
+tasks.named('jar').configure {
+    dependsOn tasks.named('verifyExactCompileOnlyArtifacts')
+}

@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "": {
+      "model": "bluemap:block/missing",
+      "renderer": "bluemap_cobblemonstonestatues:exact_shape"
+    }
+  }
+}

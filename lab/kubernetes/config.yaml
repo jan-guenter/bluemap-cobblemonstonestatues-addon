@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bluemap-cobblemonstonestatues-staging-config
+  namespace: bluemap-sophisticated-staging
+  labels:
+    app.kubernetes.io/part-of: bluemap-sophisticated-staging
+    app.kubernetes.io/component: cobblemon-stone-statues
+data:
+  core.conf: |
+    accept-download: true
+    data: "bluemap"
+    render-thread-count: 2
+    update-cooldown: 60
+    full-update-interval: 0
+    scan-for-mod-resources: true
+    metrics: false
+    log: {
+      file: "bluemap/logs/debug.log"
+      append: false
+    }
+  webserver.conf: |
+    enabled: true
+    webroot: "bluemap/web"
+    port: 8100
+    log: {
+      file: "bluemap/logs/webserver.log"
+      append: false
+      format: "%1$s \"%3$s %4$s %5$s\" %6$s %7$s"
+    }
+  file.conf: |
+    storage-type: file
+    root: "bluemap/web/maps"
+    compression: gzip
+  cobblemonstonestatues_staging.conf: |
+    world: "world"
+    dimension: "minecraft:overworld"
+    name: "Cobblemon Stone Statues review"
+    start-pos: { x: 220, z: 216 }
+    render-mask: [
+      {
+        min-x: 204
+        max-x: 244
+        min-z: 204
+        max-z: 240
+        min-y: 99
+        max-y: 108
+      }
+    ]
+    storage: "file"

@@ -1,0 +1,8 @@
+{
+  "id": "bluemap-cobblemonstonestatues",
+  "name": "BlueMap Cobblemon Stone Statues Add-on",
+  "entrypoint": "io.github.janguenter.bluemap.cobblemonstonestatues.BlueMapCobblemonStoneStatuesAddon",
+  "version": "${version}",
+  "dependencies": [],
+  "soft-dependencies": []
+}

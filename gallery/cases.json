@@ -1,0 +1,163 @@
+{
+  "camera": {
+    "pitch": 22,
+    "position": [
+      220.5,
+      115,
+      249.5
+    ],
+    "yaw": 180
+  },
+  "cells": [
+    {
+      "block": "cobblemonstonestatues:pokemon_statue",
+      "id": "joltik-half-walking-stone-r0",
+      "kind": "valid",
+      "position": [
+        208,
+        100,
+        216
+      ],
+      "selection": {
+        "AnimationName": "walking",
+        "AspectsCsv": "",
+        "FormId": "Normal",
+        "Material": "STONE",
+        "Rotation45": 0,
+        "Scale": "HALF",
+        "SpeciesId": "cobblemon:joltik",
+        "StoneSeed": 0
+      }
+    },
+    {
+      "block": "cobblemonstonestatues:pokemon_statue",
+      "id": "bulbasaur-normal-sleep-stone-r1",
+      "kind": "valid",
+      "position": [
+        216,
+        100,
+        216
+      ],
+      "selection": {
+        "AnimationName": "sleep",
+        "AspectsCsv": "",
+        "FormId": "Normal",
+        "Material": "STONE",
+        "Rotation45": 1,
+        "Scale": "NORMAL",
+        "SpeciesId": "cobblemon:bulbasaur",
+        "StoneSeed": 0
+      }
+    },
+    {
+      "block": "cobblemonstonestatues:pokemon_statue",
+      "id": "pikachu-double-shoulder-left-gold-r3",
+      "kind": "valid",
+      "position": [
+        224,
+        100,
+        216
+      ],
+      "selection": {
+        "AnimationName": "shoulder_left",
+        "AspectsCsv": "",
+        "FormId": "Normal",
+        "Material": "GOLD_BLOCK",
+        "Rotation45": 3,
+        "Scale": "DOUBLE",
+        "SpeciesId": "cobblemon:pikachu",
+        "StoneSeed": 0
+      }
+    },
+    {
+      "block": "cobblemonstonestatues:pokemon_statue",
+      "id": "hisuian-decidueye-triple-fly-stone-r5",
+      "kind": "valid",
+      "position": [
+        232,
+        100,
+        216
+      ],
+      "selection": {
+        "AnimationName": "fly",
+        "AspectsCsv": "hisuian",
+        "FormId": "Hisui",
+        "Material": "STONE",
+        "Rotation45": 5,
+        "Scale": "TRIPLE",
+        "SpeciesId": "cobblemon:decidueye",
+        "StoneSeed": 0
+      }
+    },
+    {
+      "block": "minecraft:stone",
+      "id": "stone-control",
+      "kind": "control",
+      "position": [
+        208,
+        100,
+        224
+      ]
+    },
+    {
+      "block": "minecraft:gold_block",
+      "id": "gold-control",
+      "kind": "control",
+      "position": [
+        216,
+        100,
+        224
+      ]
+    },
+    {
+      "block": "cobblemonstonestatues:statue_proxy",
+      "expected": "stock-invisible; production never owns proxy",
+      "id": "orphan-statue-proxy",
+      "kind": "fallback",
+      "position": [
+        224,
+        100,
+        224
+      ]
+    },
+    {
+      "block": "cobblemonstonestatues:pokemon_statue",
+      "expected": "stock-invisible; choice absent from attested export",
+      "id": "unknown-species-master",
+      "kind": "fallback",
+      "position": [
+        232,
+        100,
+        224
+      ],
+      "selection": {
+        "AnimationName": "portrait",
+        "AspectsCsv": "",
+        "FormId": "Normal",
+        "Material": "STONE",
+        "Rotation45": 0,
+        "Scale": "NORMAL",
+        "SpeciesId": "cobblemon:atmons_unknown_species",
+        "StoneSeed": 0
+      }
+    }
+  ],
+  "logical_cells": 8,
+  "material_controls": 2,
+  "occupied_aabb": {
+    "maximum": [
+      232,
+      100,
+      224
+    ],
+    "minimum": [
+      208,
+      100,
+      216
+    ]
+  },
+  "profile": "atmons-1.2.0-stone-statues-1.1-cobblemon-1.7.3",
+  "schema": 1,
+  "stock_invisible_fallbacks": 2,
+  "valid_representatives": 4
+}

@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stone-artifact-loader
+  namespace: bluemap-sophisticated-staging
+  labels:
+    app.kubernetes.io/name: stone-artifact-loader
+    app.kubernetes.io/part-of: bluemap-sophisticated-staging
+    app.kubernetes.io/component: cobblemon-stone-statues
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  terminationGracePeriodSeconds: 5
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: loader
+      image: busybox@sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
+      command:
+        - sh
+        - -eu
+        - -c
+        - |
+          artifact_dir=/data/.bluemap-sophisticated-staging
+          mkdir -p "${artifact_dir}"
+          rm -f "${artifact_dir}/.stone-upload-complete" \
+            "${artifact_dir}/.stone-artifacts-verified"
+          printf 'READY_FOR_UPLOAD\n'
+
+          remaining=1800
+          while [ ! -e "${artifact_dir}/.stone-upload-complete" ]; do
+            if [ "${remaining}" -le 0 ]; then
+              printf 'Timed out waiting for the atomic upload marker.\n' >&2
+              exit 1
+            fi
+            remaining=$((remaining - 2))
+            sleep 2
+          done
+
+          server="${artifact_dir}/ServerFiles-1.2.0.zip"
+          bluemap="${artifact_dir}/bluemap.jar"
+          addon="${artifact_dir}/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar"
+          gallery="${artifact_dir}/bluemap-cobblemonstonestatues-gallery.zip"
+          bundle="${artifact_dir}/stone-pose-states-atmons-1.2.0.zip"
+          test "$(stat -c %s "${server}")" -eq 1055896389
+          test "$(stat -c %s "${bluemap}")" -eq 6467235
+          test "$(stat -c %s "${addon}")" -eq 286752
+          test "$(stat -c %s "${gallery}")" -eq 3153
+          test "$(stat -c %s "${bundle}")" -eq 99408820
+          printf '%s  %s\n' \
+            'de112ed8d79b3ff027e399a5108b706f6a2db3be74b15d0db6f6b9d6ac268e6c' "${server}" \
+            '749f7647fa29764cea113114a7ab3259271bab3da22720989f2bd9fd1f3ba150' "${bluemap}" \
+            '9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4' "${addon}" \
+            '1d8193b783eb1d30dd347896cc433e6de72549a472d800ff7484b16a17d04121' "${gallery}" \
+            'edc1b15d97267a28f9ef946a0c645e924b75322afb976aeeb220ad8c5056eefa' "${bundle}" \
+            | sha256sum -c -
+          chmod 0444 "${server}" "${bluemap}" "${addon}" "${gallery}" "${bundle}"
+          cat > "${artifact_dir}/.stone-artifacts-verified" <<'EOF'
+          bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar 286752 9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4
+          bluemap-cobblemonstonestatues-gallery.zip 3153 1d8193b783eb1d30dd347896cc433e6de72549a472d800ff7484b16a17d04121
+          stone-pose-states-atmons-1.2.0.zip 99408820 edc1b15d97267a28f9ef946a0c645e924b75322afb976aeeb220ad8c5056eefa
+          EOF
+          printf 'LOCAL_ARTIFACTS_VERIFIED\n'
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 250m
+          memory: 128Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: data

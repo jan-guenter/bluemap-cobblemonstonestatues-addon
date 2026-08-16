@@ -1,0 +1,275 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft
+  namespace: bluemap-sophisticated-staging
+spec:
+  replicas: 0
+  template:
+    metadata:
+      annotations:
+        bluemap.guenter.cloud/addon-sha256: "9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4"
+        bluemap.guenter.cloud/gallery-sha256: "1d8193b783eb1d30dd347896cc433e6de72549a472d800ff7484b16a17d04121"
+        bluemap.guenter.cloud/pose-bundle-sha256: "edc1b15d97267a28f9ef946a0c645e924b75322afb976aeeb220ad8c5056eefa"
+        bluemap.guenter.cloud/stone-statues-mode: "format-2-controlled-staging"
+        bluemap.guenter.cloud/progress-deadline-refresh: null
+        bluemap.guenter.cloud/rechiseled-addon-mode: null
+        bluemap.guenter.cloud/rechiseled-head: null
+        bluemap.guenter.cloud/removal-lifecycle: null
+    spec:
+      containers:
+        - name: minecraft
+          env:
+            - name: TZ
+              value: Europe/Berlin
+            - name: BLUEMAP_COBBLEMON_STATUES_POSE_BUNDLE
+              value: /data/.bluemap-sophisticated-staging/stone-pose-states-atmons-1.2.0.zip
+            - name: BLUEMAP_COBBLEMON_STATUES_POSE_BUNDLE_SHA256
+              value: edc1b15d97267a28f9ef946a0c645e924b75322afb976aeeb220ad8c5056eefa
+      initContainers:
+        - name: verify-and-unpack
+          env:
+            - name: SERVER_ARCHIVE_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: server-archive-size
+            - name: SERVER_ARCHIVE_SHA256
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: server-archive-sha256
+          args:
+            - |
+              artifact_dir=/data/.bluemap-sophisticated-staging
+              archive="${artifact_dir}/ServerFiles-1.2.0.zip"
+              test "$(stat -c %s "${archive}")" -eq "${SERVER_ARCHIVE_SIZE}"
+              printf '%s  %s\n' "${SERVER_ARCHIVE_SHA256}" "${archive}" | sha256sum -c -
+              if [ ! -e /data/.atmons-server-pack-1.2.0 ]; then
+                unzip -o "${archive}" -d /data
+                touch /data/.atmons-server-pack-1.2.0
+              fi
+              test "$(stat -c %s /data/neoforge-21.1.248-installer.jar)" -eq 6972104
+              printf '%s  %s\n' \
+                '68eeab77059ba53df1812f1afa5bf530ab2566a3cdcd5f924aa6e71be42e410c' /data/neoforge-21.1.248-installer.jar \
+                'b5ae8fa0d0e16d104e79d71b085dc64f3f00b845cd5f1dba21f91e7a686683c6' /data/mods/allthemons-0.5.0.jar \
+                '962d75df4fb649d94863a7a7d130d4d2b3de4da9b3cae4c44b1ce90f37ec0ed5' /data/mods/Cobblemon-neoforge-1.7.3+1.21.1.jar \
+                '0fece8e5a988b660f2b608a316f88e2572290835fec1acf67d78329133e92f09' /data/mods/cobblemonstonestatues-neoforge-1.1.jar \
+                '25ca0afdac71220a34a8dc74cffb14e2eaffc292b0ecb81ebb8b465edf3d73cb' /data/mods/mega_showdown-neoforge-1.9.3+1.7.3+1.21.1.jar \
+                'dde0516b938fe469005839dd6e3fe5289e3c17298f6d0448db663cb037e5c1b6' /data/mods/complete-cobblemon-collection-myths-and-legends-compat-2.1.0.jar \
+                '76e9eba02d08500981576c43a4c4b210c734ed6ed4aef121cb260c5378410c50' /data/mods/zamega-neoforge-1.7.5-hotfix.jar \
+                | sha256sum -c -
+              cat > /data/eula.txt <<'EOF'
+              eula=true
+              EOF
+              cat > /data/server.properties <<'EOF'
+              accepts-transfers=false
+              allow-flight=true
+              broadcast-console-to-ops=false
+              broadcast-rcon-to-ops=false
+              difficulty=peaceful
+              enable-command-block=false
+              enable-jmx-monitoring=false
+              enable-query=false
+              enable-rcon=false
+              enforce-secure-profile=true
+              force-gamemode=true
+              function-permission-level=4
+              gamemode=creative
+              generate-structures=false
+              level-name=world
+              level-seed=731963181124214131
+              level-type=minecraft:flat
+              max-players=2
+              max-tick-time=-1
+              max-world-size=512
+              motd=BlueMap Cobblemon Stone Statues staging
+              online-mode=true
+              op-permission-level=4
+              pvp=false
+              server-port=25565
+              simulation-distance=4
+              spawn-animals=false
+              spawn-monsters=false
+              spawn-npcs=false
+              spawn-protection=0
+              sync-chunk-writes=true
+              view-distance=6
+              white-list=false
+              EOF
+              controls_dir=/data/world/datapacks/bluemap-staging-performance-controls
+              mkdir -p \
+                "${controls_dir}/data/minecraft/tags/function" \
+                "${controls_dir}/data/bluemap_staging/function"
+              cat > "${controls_dir}/pack.mcmeta" <<'EOF'
+              {
+                "pack": {
+                  "pack_format": 48,
+                  "description": "Disposable BlueMap staging performance controls"
+                }
+              }
+              EOF
+              cat > "${controls_dir}/data/minecraft/tags/function/load.json" <<'EOF'
+              {
+                "values": [
+                  "bluemap_staging:performance"
+                ]
+              }
+              EOF
+              cat > "${controls_dir}/data/bluemap_staging/function/performance.mcfunction" <<'EOF'
+              gamerule doDaylightCycle false
+              gamerule doWeatherCycle false
+              gamerule randomTickSpeed 0
+              gamerule doVinesSpread false
+              gamerule doMobSpawning false
+              gamerule doPatrolSpawning false
+              gamerule doInsomnia false
+              gamerule doTraderSpawning false
+              gamerule doWardenSpawning false
+              gamerule freezeDamage false
+              gamerule fireDamage false
+              gamerule fallDamage false
+              gamerule drowningDamage false
+              gamerule disableRaids true
+              gamerule globalSoundEvents false
+              EOF
+        - name: install-local-artifacts
+          env:
+            - name: BLUEMAP_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: bluemap-size
+            - name: BLUEMAP_SHA256
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: bluemap-sha256
+            - name: ADDON_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: addon-size
+            - name: ADDON_SHA256
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: addon-sha256
+            - name: GALLERY_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: gallery-size
+            - name: GALLERY_SHA256
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: gallery-sha256
+            - name: POSE_BUNDLE_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: pose-bundle-size
+            - name: POSE_BUNDLE_SHA256
+              valueFrom:
+                configMapKeyRef:
+                  name: bluemap-cobblemonstonestatues-staging-pins
+                  key: pose-bundle-sha256
+          args:
+            - |
+              artifact_dir=/data/.bluemap-sophisticated-staging
+              bluemap_source="${artifact_dir}/bluemap.jar"
+              addon_source="${artifact_dir}/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar"
+              gallery_source="${artifact_dir}/bluemap-cobblemonstonestatues-gallery.zip"
+              bundle="${artifact_dir}/stone-pose-states-atmons-1.2.0.zip"
+              bluemap_target=/data/mods/bluemap-5.22-agent.backport-5.22-mc1.21.1-2-neoforge.jar
+              addon_target=/data/config/bluemap/packs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar
+              gallery_target=/data/world/datapacks/bluemap-cobblemonstonestatues-gallery.zip
+              test "$(stat -c %s "${bluemap_source}")" -eq "${BLUEMAP_SIZE}"
+              test "$(stat -c %s "${addon_source}")" -eq "${ADDON_SIZE}"
+              test "$(stat -c %s "${gallery_source}")" -eq "${GALLERY_SIZE}"
+              test "$(stat -c %s "${bundle}")" -eq "${POSE_BUNDLE_SIZE}"
+              printf '%s  %s\n' \
+                "${BLUEMAP_SHA256}" "${bluemap_source}" \
+                "${ADDON_SHA256}" "${addon_source}" \
+                "${GALLERY_SHA256}" "${gallery_source}" \
+                "${POSE_BUNDLE_SHA256}" "${bundle}" \
+                | sha256sum -c -
+              other_bluemap="$({ find /data/mods -maxdepth 1 -type f \
+                \( -iname 'bluemap*.jar' -o -iname '*bluemap*.jar' \) \
+                ! -path "${bluemap_target}"; } 2>/dev/null || true)"
+              if [ -n "${other_bluemap}" ]; then
+                printf 'Unexpected BlueMap JAR already present: %s\n' "${other_bluemap}" >&2
+                exit 1
+              fi
+              mkdir -p /data/mods /data/config/bluemap/maps /data/config/bluemap/packs \
+                /data/config/bluemap/storages /data/world/datapacks
+              cp "${bluemap_source}" "${bluemap_target}"
+              find /data/config/bluemap/packs -maxdepth 1 -type f -name '*.jar' -delete
+              rm -f -- \
+                /data/config/bluemap/packs/zz-0426-ccc-compat.zip \
+                /data/config/bluemap/packs/zz-0418-allthemons.zip \
+                /data/config/bluemap/packs/zz-0308-zamega.zip \
+                /data/config/bluemap/packs/zz-0307-mega-showdown.zip \
+                /data/config/bluemap/packs/zz-0196-cobblemon.zip
+              cp "${addon_source}" "${addon_target}"
+              ln -s ../../../mods/complete-cobblemon-collection-myths-and-legends-compat-2.1.0.jar \
+                /data/config/bluemap/packs/zz-0426-ccc-compat.zip
+              ln -s ../../../mods/allthemons-0.5.0.jar \
+                /data/config/bluemap/packs/zz-0418-allthemons.zip
+              ln -s ../../../mods/zamega-neoforge-1.7.5-hotfix.jar \
+                /data/config/bluemap/packs/zz-0308-zamega.zip
+              ln -s ../../../mods/mega_showdown-neoforge-1.9.3+1.7.3+1.21.1.jar \
+                /data/config/bluemap/packs/zz-0307-mega-showdown.zip
+              ln -s ../../../mods/Cobblemon-neoforge-1.7.3+1.21.1.jar \
+                /data/config/bluemap/packs/zz-0196-cobblemon.zip
+              find /data/world/datapacks -maxdepth 1 -type f \
+                -name 'bluemap-*-gallery.zip' -delete
+              cp "${gallery_source}" "${gallery_target}"
+              cp /lab-config/core.conf /data/config/bluemap/core.conf
+              cp /lab-config/webserver.conf /data/config/bluemap/webserver.conf
+              cp /lab-config/file.conf /data/config/bluemap/storages/file.conf
+              find /data/config/bluemap/maps -maxdepth 1 -type f -name '*.conf' -delete
+              cp /lab-config/cobblemonstonestatues_staging.conf \
+                /data/config/bluemap/maps/cobblemonstonestatues_staging.conf
+              chmod 0644 "${bluemap_target}" "${addon_target}" "${gallery_target}" \
+                /data/config/bluemap/core.conf \
+                /data/config/bluemap/webserver.conf /data/config/bluemap/storages/file.conf \
+                /data/config/bluemap/maps/cobblemonstonestatues_staging.conf
+              chmod 0444 "${bundle}"
+              rm -rf -- /data/bluemap/web/maps/cobblemonstonestatues_staging
+              test "$(find /data/config/bluemap/packs -maxdepth 1 -type f -name '*.jar' \
+                | wc -l)" -eq 1
+              test -f "${addon_target}"
+              test "$(find /data/config/bluemap/packs -maxdepth 1 -type l \
+                -name 'zz-*.zip' | wc -l)" -eq 5
+              test "$(readlink -f /data/config/bluemap/packs/zz-0426-ccc-compat.zip)" \
+                = /data/mods/complete-cobblemon-collection-myths-and-legends-compat-2.1.0.jar
+              test "$(readlink -f /data/config/bluemap/packs/zz-0418-allthemons.zip)" \
+                = /data/mods/allthemons-0.5.0.jar
+              test "$(readlink -f /data/config/bluemap/packs/zz-0308-zamega.zip)" \
+                = /data/mods/zamega-neoforge-1.7.5-hotfix.jar
+              test "$(readlink -f /data/config/bluemap/packs/zz-0307-mega-showdown.zip)" \
+                = /data/mods/mega_showdown-neoforge-1.9.3+1.7.3+1.21.1.jar
+              test "$(readlink -f /data/config/bluemap/packs/zz-0196-cobblemon.zip)" \
+                = /data/mods/Cobblemon-neoforge-1.7.3+1.21.1.jar
+              test "$(find /data/world/datapacks -maxdepth 1 -type f \
+                -name 'bluemap-*-gallery.zip' | wc -l)" -eq 1
+              test "$(basename "$(find /data/world/datapacks -maxdepth 1 -type f \
+                -name 'bluemap-*-gallery.zip')")" \
+                = 'bluemap-cobblemonstonestatues-gallery.zip'
+              test "$(find /data/config/bluemap/maps -maxdepth 1 -type f -name '*.conf' \
+                | wc -l)" -eq 1
+              test "$(basename "$(find /data/config/bluemap/maps -maxdepth 1 \
+                -type f -name '*.conf')")" = 'cobblemonstonestatues_staging.conf'
+              printf '%s  %s\n' \
+                "${BLUEMAP_SHA256}" "${bluemap_target}" \
+                "${ADDON_SHA256}" "${addon_target}" \
+                "${GALLERY_SHA256}" "${gallery_target}" \
+                "${POSE_BUNDLE_SHA256}" "${bundle}" \
+                | sha256sum -c -
+      volumes:
+        - name: lab-config
+          configMap:
+            name: bluemap-cobblemonstonestatues-staging-config
+            defaultMode: 420
