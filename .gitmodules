@@ -1,0 +1,3 @@
+[submodule "tooling/bluemap-addon-toolkit"]
+	path = tooling/bluemap-addon-toolkit
+	url = https://github.com/jan-guenter/bluemap-addon-toolkit.git
