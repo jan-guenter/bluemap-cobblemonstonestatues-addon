@@ -1,6 +1,72 @@
 // SPDX-License-Identifier: MIT
 
 pluginManagement {
+    def toolkitPath = 'tooling/bluemap-addon-toolkit'
+    def expectedToolkitCommit = '6cd34a8368cc4ee8628fbe830a90ec5b14960629'
+    def consumerRoot = settings.settingsDir
+    def toolkit = new File(consumerRoot, toolkitPath)
+
+    if (!(expectedToolkitCommit ==~ /[0-9a-f]{40}/)
+            || !new File(consumerRoot, '.git').exists()
+            || !toolkit.isDirectory()
+            || !new File(toolkit, '.git').exists()) {
+        throw new GradleException(
+                'Toolkit trust preflight is not configured or initialized. '
+                        + "Run: git submodule update --init --recursive -- ${toolkitPath}"
+        )
+    }
+
+    def toolkitGitOutput = {
+        File repository, List<String> arguments, String operation ->
+        def execution = settings.providers.exec {
+            commandLine(['git', '-C', repository.absolutePath] + arguments)
+            ignoreExitValue = true
+            environment 'LC_ALL', 'C'
+            environment 'GIT_OPTIONAL_LOCKS', '0'
+        }
+        def result = execution.result.get()
+        def output = execution.standardOutput.asText.get().trim()
+        def error = execution.standardError.asText.get().trim()
+        if (result.exitValue != 0) {
+            throw new GradleException(
+                    "Unable to ${operation}: ${error ?: 'Git returned no diagnostic.'}"
+            )
+        }
+        output
+    }
+
+    if (!toolkitGitOutput(consumerRoot, ['rev-parse', '--show-prefix'],
+            'verify the consumer root').isEmpty()) {
+        throw new GradleException('settings.gradle must be at the Git worktree root')
+    }
+
+    def tree = toolkitGitOutput(consumerRoot, ['ls-tree', 'HEAD', '--', toolkitPath],
+            'read the committed toolkit gitlink').tokenize(' \t')
+    def index = toolkitGitOutput(consumerRoot, ['ls-files', '--stage', '--', toolkitPath],
+            'read the indexed toolkit gitlink').tokenize(' \t')
+    if (tree.size() != 4 || tree[0] != '160000' || tree[1] != 'commit'
+            || tree[2] != expectedToolkitCommit || tree[3] != toolkitPath
+            || index.size() != 4 || index[0] != '160000'
+            || index[1] != expectedToolkitCommit || index[2] != '0'
+            || index[3] != toolkitPath) {
+        throw new GradleException('Committed/indexed toolkit gitlink does not match its pin')
+    }
+
+    def toolkitHead = toolkitGitOutput(toolkit,
+            ['rev-parse', '--verify', 'HEAD^{commit}'], 'read toolkit HEAD')
+    def toolkitStatus = toolkitGitOutput(toolkit,
+            ['status', '--porcelain=v1', '--untracked-files=all',
+             '--ignore-submodules=none'], 'verify the toolkit worktree')
+    if (toolkitHead != expectedToolkitCommit || !toolkitStatus.isEmpty()) {
+        throw new GradleException('Toolkit HEAD differs from the gitlink or is dirty')
+    }
+
+    def gradleBuild = new File(toolkit, 'gradle')
+    if (!new File(gradleBuild, 'settings.gradle').isFile()) {
+        throw new GradleException('Pinned toolkit has no Gradle convention build')
+    }
+    includeBuild(gradleBuild)
+
     repositories {
         gradlePluginPortal()
         mavenCentral()

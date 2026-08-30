@@ -4,6 +4,7 @@ plugins {
     id 'java-library'
     id 'checkstyle'
     id 'maven-publish'
+    id 'io.github.janguenter.bluemap-addon.java-conventions'
 }
 
 group = addon_group
@@ -11,11 +12,6 @@ version = addon_version
 
 base {
     archivesName = artifact_id
-}
-
-java {
-    toolchain.languageVersion = JavaLanguageVersion.of(21)
-    withSourcesJar()
 }
 
 repositories {
@@ -39,20 +35,11 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-    options.release = 21
-    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
-}
-
 tasks.withType(AbstractArchiveTask).configureEach {
-    preserveFileTimestamps = false
-    reproducibleFileOrder = true
     includeEmptyDirs = false
 }
 
 tasks.named('test', Test).configure {
-    useJUnitPlatform()
     for (String property : [
             'stoneStatuesJar', 'cobblemonJar', 'poseCatalogDir'
     ]) {
@@ -91,18 +78,6 @@ tasks.named('processResources').configure {
     inputs.property('version', project.version)
     filesMatching('bluemap.addon.json') {
         expand(version: project.version)
-    }
-}
-
-checkstyle {
-    toolVersion = '10.18.2'
-    configFile = file('config/checkstyle/checkstyle.xml')
-}
-
-tasks.withType(Checkstyle).configureEach {
-    reports {
-        xml.required = true
-        html.required = true
     }
 }
 
