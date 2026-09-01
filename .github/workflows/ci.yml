@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: jan-guenter/BlueMap
-          ref: 9be321df995a1103808621d529eb72773e719d4d
+          ref: 7e07f4e74ec1e92a6ead9aa1e66054af3e133aac
           path: .ci/bluemap
           submodules: recursive
           persist-credentials: false
@@ -87,10 +87,10 @@ jobs:
         with:
           name: bluemap-cobblemonstonestatues-${{ github.sha }}
           path: |
-            build/libs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1.jar
-            build/libs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.1-sources.jar
-            tools/pose-exporter/build/libs/atmons-stone-pose-exporter-0.1.0-alpha.1.jar
-            tools/pose-exporter/build/libs/atmons-stone-pose-exporter-0.1.0-alpha.1-sources.jar
+            build/libs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.2.jar
+            build/libs/bluemap-cobblemonstonestatues-addon-0.1.0-alpha.2-sources.jar
+            tools/pose-exporter/build/libs/atmons-stone-pose-exporter-0.1.0-alpha.2.jar
+            tools/pose-exporter/build/libs/atmons-stone-pose-exporter-0.1.0-alpha.2-sources.jar
             build/publications/addon/pom-default.xml
             tools/pose-exporter/build/publications/exporter/pom-default.xml
             build/publications/addon/module.json

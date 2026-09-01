@@ -18,20 +18,27 @@ The following first-party BlueMap adapter files are licensed under GNU Lesser
 General Public License 2.1 only:
 
 - `src/main/java/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/`
-  `bluemap522/BlueMap522Adapter.java`
+  `bluemap523/BlueMap523Adapter.java`
 - `src/main/java/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/`
-  `bluemap522/StatueBlockEntityData.java`
+  `bluemap523/StatueBlockEntityData.java`
 - `src/main/java/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/`
-  `bluemap522/StoneStatuesRenderer.java`
+  `bluemap523/StoneStatuesRenderer.java`
 - `src/main/java/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/`
-  `bluemap522/StoneStatuesResourceExtension.java`
+  `bluemap523/StoneStatuesResourceExtension.java`
 - `src/test/java/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/`
-  `bluemap522/BlueMap522AdapterTest.java`
+  `bluemap523/BlueMap523AdapterTest.java`
 
 They preserve the license of the first-party adapter framework reused from
 BlueMap Botany Pots Add-on `v0.1.0-alpha.1`, commit
 `f40eed6c1f7f30356bcdfabbc3e2a6455fec7884`. The unmodified LGPL-2.1-only
 text is in [`LICENSES/LGPL-2.1-only.txt`](LICENSES/LGPL-2.1-only.txt).
+
+The four source-compiled classes under
+`io/github/janguenter/bluemap/addon/adapter/api/bluemap523/` retain the MIT
+license from BlueMap Add-on Adapter API `0.1.0-alpha.2`. They are ordinary
+first-party MIT-covered source in this Larger Work, not a nested dependency.
+Both production archives carry the module's exact license separately as
+`META-INF/LICENSE-bluemap-addon-adapter-api`.
 
 The production add-on and client-only helper are Larger Works containing both
 MIT-covered files and the MPL-2.0-covered file. The production add-on also

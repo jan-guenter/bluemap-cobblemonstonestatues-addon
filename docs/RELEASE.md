@@ -1,8 +1,8 @@
 # Release artifact boundary
 
-The owner accepted the exact resource-backed eight-cell gallery on 2026-08-16.
-The tag-gated release workflow is therefore authorized for the immutable
-`0.1.0-alpha.1` prerelease. Its GitHub Release asset allowlist contains exactly
+The owner accepted the combined All the Mons 1.2.0 render on 2026-09-01.
+The tag-gated release workflow is prepared for the immutable
+`0.1.0-alpha.2` prerelease. Its GitHub Release asset allowlist contains exactly
 these four version-matched JARs:
 
 1. `bluemap-cobblemonstonestatues-addon-<version>.jar`
@@ -19,15 +19,15 @@ The accepted four-JAR identities are:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| Production JAR | 286,752 | `9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4` |
-| Production sources JAR | 118,224 | `61d6d640792e88526998e5f2e4f8f3228acb8add360cb3b8de670e383d73d4ac` |
-| Client exporter JAR | 284,840 | `f35727ba2ce5c96abe085df36d5d02534b6a19e1f710eb4c145c0d7243c75b98` |
-| Client exporter sources JAR | 103,586 | `fc4a4c0808b006ec07c8a17965c800b2e612ac11e0ed755749824d3524c61dde` |
+| Production JAR | 291,240 | `20108b9de728a92a91da458d4ba9aa91d0c83ea5fe65549a8b308c97a0c67617` |
+| Production sources JAR | 122,460 | `24a953c56bb8b019ce21007d93982b0007209a8c1a06875b420b64d5e4ccedc8` |
+| Client exporter JAR | 285,447 | `bdc09212215e463840f364c683b9bdc663968a11bf0aed665a515db4f71510af` |
+| Client exporter sources JAR | 104,193 | `a5b1b95be96068e6428589824f834d6a846326ba624e826acb8ad1147c59470e` |
 
 The two Maven modules are
-`io.github.jan-guenter:bluemap-cobblemonstonestatues-addon:0.1.0-alpha.1`
+`io.github.jan-guenter:bluemap-cobblemonstonestatues-addon:0.1.0-alpha.2`
 and
-`io.github.janguenter.stoneposeexporter:atmons-stone-pose-exporter:0.1.0-alpha.1`.
+`io.github.janguenter.stoneposeexporter:atmons-stone-pose-exporter:0.1.0-alpha.2`.
 Each publishes its binary JAR, sources JAR, POM, and Gradle module metadata.
 The helper module packages its own frozen `THIRD_PARTY.md`, byte-identical to
 the notice in the physically executed and accepted helper. That artifact-time

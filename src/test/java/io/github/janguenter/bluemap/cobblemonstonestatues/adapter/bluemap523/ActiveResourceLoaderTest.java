@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522;
+package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523;
 
 import de.bluecolored.bluemap.core.resources.pack.Pack;
 import de.bluecolored.bluemap.core.resources.pack.PackVersion;
