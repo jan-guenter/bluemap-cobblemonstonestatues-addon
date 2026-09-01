@@ -5,7 +5,7 @@
  * v0.1.0-alpha.1 / f40eed6c1f7f30356bcdfabbc3e2a6455fec7884.
  * Modified in 2026 for the Cobblemon Stone Statues integration.
  */
-package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522;
+package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523;
 
 import io.github.janguenter.bluemap.cobblemonstonestatues.model.StatueSelection;
 import org.junit.jupiter.api.Test;
@@ -17,13 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class BlueMap522AdapterTest {
+class BlueMap523AdapterTest {
 
     @Test
     void installsBeforeBlueNbtSnapshotAndRetainsEverySelectionField() {
-        assertTrue(BlueMap522Adapter.install());
-        assertTrue(BlueMap522Adapter.probeBlockEntityRetention());
-        assertTrue(BlueMap522Adapter.install());
+        assertTrue(BlueMap523Adapter.install());
+        assertTrue(BlueMap523Adapter.probeBlockEntityRetention());
+        assertTrue(BlueMap523Adapter.install());
     }
 
     @Test
@@ -45,7 +45,7 @@ class BlueMap522AdapterTest {
         AtomicBoolean permanentFailure = new AtomicBoolean();
         AtomicInteger registrations = new AtomicInteger();
 
-        assertFalse(BlueMap522Adapter.registerAll(
+        assertFalse(BlueMap523Adapter.registerAll(
                 () -> permanentFailure.set(true),
                 () -> {
                     registrations.incrementAndGet();

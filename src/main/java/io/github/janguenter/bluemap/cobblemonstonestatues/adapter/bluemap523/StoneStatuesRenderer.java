@@ -5,7 +5,7 @@
  * v0.1.0-alpha.1 / f40eed6c1f7f30356bcdfabbc3e2a6455fec7884.
  * Modified in 2026 for the Cobblemon Stone Statues integration.
  */
-package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522;
+package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523;
 
 import de.bluecolored.bluemap.core.map.TextureGallery;
 import de.bluecolored.bluemap.core.map.hires.MaxCapacityReachedException;

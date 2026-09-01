@@ -14,6 +14,10 @@ base {
     archivesName = artifact_id
 }
 
+sourceSets {
+    main.java.srcDir 'modules/bluemap-addon-adapter-api/src/main/java'
+}
+
 repositories {
     mavenCentral()
     maven {
@@ -93,6 +97,10 @@ tasks.named('jar', Jar).configure {
         into 'META-INF'
         rename { 'LICENSE-bluemap-cobblemonstonestatues-addon' }
     }
+    from('modules/bluemap-addon-adapter-api/LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-bluemap-addon-adapter-api' }
+    }
     from('NOTICE.md') {
         into 'META-INF'
         rename { 'NOTICE-bluemap-cobblemonstonestatues-addon.md' }
@@ -131,6 +139,10 @@ tasks.named('sourcesJar', Jar).configure {
         into 'META-INF'
         rename { 'LICENSE-bluemap-cobblemonstonestatues-addon' }
     }
+    from('modules/bluemap-addon-adapter-api/LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-bluemap-addon-adapter-api' }
+    }
     from('NOTICE.md') {
         into 'META-INF'
         rename { 'NOTICE-bluemap-cobblemonstonestatues-addon.md' }
@@ -161,14 +173,34 @@ tasks.named('sourcesJar', Jar).configure {
         into 'META-INF/bluemap-cobblemonstonestatues/cleanroom/stone-box-replay'
     }
     from('src/test/java/io/github/janguenter/bluemap/cobblemonstonestatues/'
-            + 'adapter/bluemap522/BlueMap522AdapterTest.java') {
+            + 'adapter/bluemap523/BlueMap523AdapterTest.java') {
         into('test/io/github/janguenter/bluemap/cobblemonstonestatues/'
-                + 'adapter/bluemap522')
+                + 'adapter/bluemap523')
     }
 }
 
 def productionJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
 def publishedSourcesJar = tasks.named('sourcesJar', Jar).flatMap { it.archiveFile }
+def sharedAdapterApiPackage =
+        'io/github/janguenter/bluemap/addon/adapter/api/bluemap523/'
+def sharedAdapterApiClasses = [
+        'BlueMapRuntimeCompatibility.class',
+        'RegistryGuard.class',
+        'ResourceExtensionType.class',
+        'SyntheticDispatch.class'
+].collect { sharedAdapterApiPackage + it }
+def sharedAdapterApiSources = [
+        'BlueMapRuntimeCompatibility.java',
+        'RegistryGuard.java',
+        'ResourceExtensionType.java',
+        'SyntheticDispatch.java'
+].collect { sharedAdapterApiPackage + it }
+def legacyLocalAdapterPackage =
+        'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/bluemap522/'
+def displacedAdapterHelpers = [
+        'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/bluemap523/AdapterCompatibility',
+        'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/bluemap523/StoneStatuesResourceExtensionType'
+]
 def retiredFormatOneEntry = { String path ->
     path.contains('MeshCodec')
             || path == 'pose-catalog.json'
@@ -202,6 +234,7 @@ tasks.register('verifyProductionJar') {
                     'assets/bluemap_cobblemonstonestatues/blockstates/exact_shape.json',
                     'bluemap-cobblemonstonestatues/profiles/exact-artifacts.json',
                     'META-INF/LICENSE-bluemap-cobblemonstonestatues-addon',
+                    'META-INF/LICENSE-bluemap-addon-adapter-api',
                     'META-INF/licenses/MPL-2.0.txt',
                     'META-INF/licenses/LGPL-2.1-only.txt',
                     'META-INF/LICENSES-bluemap-cobblemonstonestatues-addon.md',
@@ -225,7 +258,7 @@ tasks.register('verifyProductionJar') {
                             + 'cleanroom/BedrockBoxReplay.class',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
                             + 'cleanroom/JomlAdapters.class'
-            ]
+            ] + sharedAdapterApiClasses
             def missing = required.findAll { !entries.contains(it) }
             if (!missing.isEmpty()) {
                 throw new GradleException("Production JAR is missing: ${missing}")
@@ -253,6 +286,7 @@ tasks.register('verifyProductionJar') {
             def foreignClasses = entries.findAll {
                 it.endsWith('.class')
                         && !it.startsWith('io/github/janguenter/bluemap/cobblemonstonestatues/')
+                        && !sharedAdapterApiClasses.contains(it)
             }
             def forbidden = archiveEntries.findAll {
                 it.endsWith('.jar')
@@ -267,6 +301,11 @@ tasks.register('verifyProductionJar') {
                         || it.startsWith('com/jorgaomc/')
                         || it.startsWith('net/minecraft/')
                         || it.startsWith('net/neoforged/')
+                        || it.startsWith(legacyLocalAdapterPackage)
+                        || displacedAdapterHelpers.any { helper -> it.startsWith(helper) }
+                        || (it.endsWith('.class')
+                        && it.startsWith(sharedAdapterApiPackage)
+                        && !sharedAdapterApiClasses.contains(it))
                         || it.contains('GeometryReplayCompiler')
                         || it.contains('GeometryMeshCompiler')
             }
@@ -278,7 +317,7 @@ tasks.register('verifyProductionJar') {
             }
             def extensionBytecode = new String(zip.getInputStream(zip.getEntry(
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StoneStatuesResourceExtension.class'
+                            + 'bluemap523/StoneStatuesResourceExtension.class'
             )).bytes, java.nio.charset.StandardCharsets.ISO_8859_1)
             def loaderBytecode = new String(zip.getInputStream(zip.getEntry(
                     'io/github/janguenter/bluemap/cobblemonstonestatues/catalog/'
@@ -334,6 +373,7 @@ tasks.register('verifySourcesJar') {
             def projectJava = entries.findAll { it.endsWith('.java') }
             def required = [
                     'META-INF/LICENSE-bluemap-cobblemonstonestatues-addon',
+                    'META-INF/LICENSE-bluemap-addon-adapter-api',
                     'META-INF/licenses/MPL-2.0.txt',
                     'META-INF/licenses/LGPL-2.1-only.txt',
                     'META-INF/LICENSES-bluemap-cobblemonstonestatues-addon.md',
@@ -354,26 +394,27 @@ tasks.register('verifySourcesJar') {
                     'io/github/janguenter/bluemap/cobblemonstonestatues/geometry/'
                             + 'cleanroom/JomlAdapters.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/BlueMap522Adapter.java',
+                            + 'bluemap523/BlueMap523Adapter.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StatueBlockEntityData.java',
+                            + 'bluemap523/StatueBlockEntityData.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StoneStatuesRenderer.java',
+                            + 'bluemap523/StoneStatuesRenderer.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StoneStatuesResourceExtension.java',
+                            + 'bluemap523/StoneStatuesResourceExtension.java',
                     'test/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/BlueMap522AdapterTest.java',
+                            + 'bluemap523/BlueMap523AdapterTest.java',
                     'META-INF/bluemap-cobblemonstonestatues/cleanroom/'
                             + 'stone-box-replay/README.md',
                     'META-INF/bluemap-cobblemonstonestatues/cleanroom/'
                             + 'stone-box-replay/SPEC.md'
-            ]
+            ] + sharedAdapterApiSources
             def missing = required.findAll { !entries.contains(it) }
             def foreignJava = projectJava.findAll {
                 !it.startsWith('io/github/janguenter/bluemap/cobblemonstonestatues/')
                         && !it.startsWith(
                         'test/io/github/janguenter/bluemap/cobblemonstonestatues/'
                 )
+                        && !sharedAdapterApiSources.contains(it)
             }
             def forbidden = archiveEntries.findAll {
                 it.endsWith('.class') || it.endsWith('.jar') || it.endsWith('.geo.json')
@@ -386,6 +427,11 @@ tasks.register('verifySourcesJar') {
                         || it.startsWith('com/jorgaomc/')
                         || it.startsWith('net/minecraft/')
                         || it.startsWith('net/neoforged/')
+                        || it.startsWith(legacyLocalAdapterPackage)
+                        || displacedAdapterHelpers.any { helper -> it == "${helper}.java" }
+                        || (it.endsWith('.java')
+                        && it.startsWith(sharedAdapterApiPackage)
+                        && !sharedAdapterApiSources.contains(it))
                         || it.contains('GeometryReplayCompiler')
                         || it.contains('GeometryMeshCompiler')
             }
@@ -407,19 +453,19 @@ tasks.register('verifySourcesJar') {
             )).getText('UTF-8')
             def lgplSource = zip.getInputStream(zip.getEntry(
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/BlueMap522Adapter.java'
+                            + 'bluemap523/BlueMap523Adapter.java'
             )).getText('UTF-8')
             def lgplPaths = [
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/BlueMap522Adapter.java',
+                            + 'bluemap523/BlueMap523Adapter.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StatueBlockEntityData.java',
+                            + 'bluemap523/StatueBlockEntityData.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StoneStatuesRenderer.java',
+                            + 'bluemap523/StoneStatuesRenderer.java',
                     'io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/StoneStatuesResourceExtension.java',
+                            + 'bluemap523/StoneStatuesResourceExtension.java',
                     'test/io/github/janguenter/bluemap/cobblemonstonestatues/adapter/'
-                            + 'bluemap522/BlueMap522AdapterTest.java'
+                            + 'bluemap523/BlueMap523AdapterTest.java'
             ]
             def badLgplNotices = lgplPaths.findAll { path ->
                 def source = zip.getInputStream(zip.getEntry(path)).getText('UTF-8')

@@ -5,16 +5,15 @@
  * v0.1.0-alpha.1 / f40eed6c1f7f30356bcdfabbc3e2a6455fec7884.
  * Modified in 2026 for the Cobblemon Stone Statues integration.
  */
-package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522;
+package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523;
 
 import de.bluecolored.bluemap.core.resources.pack.resourcepack.ResourcePack;
 import de.bluecolored.bluemap.core.resources.pack.resourcepack.ResourcePackExtension;
-import de.bluecolored.bluemap.core.resources.pack.resourcepack.blockstate.VariantSet;
-import de.bluecolored.bluemap.core.resources.pack.resourcepack.blockstate.Variants;
 import de.bluecolored.bluemap.core.resources.pack.resourcepack.texture.Texture;
 import de.bluecolored.bluemap.core.util.Key;
 import de.bluecolored.bluemap.core.world.BlockProperties;
 import de.bluecolored.bluemap.core.world.BlockState;
+import io.github.janguenter.bluemap.addon.adapter.api.bluemap523.SyntheticDispatch;
 import io.github.janguenter.bluemap.cobblemonstonestatues.activation.CompiledProfile;
 import io.github.janguenter.bluemap.cobblemonstonestatues.activation.ProfilePreflight;
 import io.github.janguenter.bluemap.cobblemonstonestatues.activation.StoneStatuesRuntime;
@@ -45,7 +44,7 @@ final class StoneStatuesResourceExtension implements ResourcePackExtension {
     private Map<Key, Texture> publishedTextures = Map.of();
 
     StoneStatuesResourceExtension(ResourcePack resourcePack, StoneStatuesRuntime runtime) {
-        this(resourcePack, runtime, BlueMap522Adapter::probeBlockEntityRetention);
+        this(resourcePack, runtime, BlueMap523Adapter::probeBlockEntityRetention);
     }
 
     StoneStatuesResourceExtension(
@@ -296,16 +295,7 @@ final class StoneStatuesResourceExtension implements ResourcePackExtension {
     private static boolean validDispatch(
             de.bluecolored.bluemap.core.resources.pack.resourcepack.blockstate.BlockState state
     ) {
-        if (state == null || state.getMultipart() != null) {
-            return false;
-        }
-        Variants variants = state.getVariants();
-        if (variants == null || variants.getDefaultVariant() == null) {
-            return false;
-        }
-        VariantSet set = variants.getDefaultVariant();
-        return set.getVariants().length == 1
-                && BlueMap522Adapter.isExpectedDispatch(set.getVariants()[0]);
+        return SyntheticDispatch.matches(state, BlueMap523Adapter.rendererType());
     }
 
     @FunctionalInterface

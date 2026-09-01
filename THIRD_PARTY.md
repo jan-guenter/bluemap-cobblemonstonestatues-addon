@@ -21,10 +21,21 @@ sources artifact carry the unmodified license text and the complete preferred
 source needed to rebuild the adapter. The client helper contains none of these
 files.
 
+## Included first-party MIT adapter sources
+
+The four BlueMap 5.23 adapter primitives are compiled from BlueMap Add-on
+Adapter API `0.1.0-alpha.2`, commit
+`e81f08bc4bfbf02d810ec8949a019130e2e61634`, production source tree
+`2f974c9bb2ba13888d69682f86f30f58922d30eb`. The exact gitlink supplies only
+`BlueMapRuntimeCompatibility`, `RegistryGuard`, `ResourceExtensionType`, and
+`SyntheticDispatch`. Its standalone module JAR is neither installed nor
+nested. These sources retain MIT.
+
 ## Compile-only and operator-installed inputs
 
-- BlueMap 5.22 and the exact Java 21/Minecraft 1.21.1 backport are compile-only
-  dependencies licensed MIT.
+- BlueMap runtime `5.22-feature.backport-5.23-stateless-java-web-server-46`,
+  exact commit `7e07f4e74ec1e92a6ead9aa1e66054af3e133aac`, and the Java 21/Minecraft
+  1.21.1 backport are compile-only dependencies licensed MIT.
 - JOML 1.10.5 is an MIT-licensed compile-only dependency supplied by the
   pinned Minecraft 1.21.1 runtime. Its exact host JAR has SHA-256
   `cac9f22f83a7aa33eebda73c16ff5261e3cb4911b6bafcf4c79ea486099d0c9a`.

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522;
+package io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523;
 
 import io.github.janguenter.bluemap.cobblemonstonestatues.activation.ResourceBlob;
 import io.github.janguenter.bluemap.cobblemonstonestatues.catalog.FormatTwoBudgets;

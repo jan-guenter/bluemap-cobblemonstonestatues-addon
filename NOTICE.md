@@ -20,6 +20,14 @@ Add-on `v0.1.0-alpha.1`, commit
 `LICENSES.md`. The client-only pose exporter does not compile or package those
 adapter files.
 
+The production add-on also source-compiles exactly four MIT classes from the
+first-party BlueMap Add-on Adapter API `0.1.0-alpha.2`, commit
+`e81f08bc4bfbf02d810ec8949a019130e2e61634`. Its standalone JAR is not bundled
+or installed. Both production archives carry its exact MIT license under a
+distinct `META-INF/LICENSE-bluemap-addon-adapter-api` path. The client-only
+exporter keeps the exact frozen notices from its physically executed
+`0.1.0-alpha.1` artifact.
+
 See `LICENSES.md` for the file-level map, `LICENSES/MPL-2.0.txt` for the full
 MPL license, `LICENSES/LGPL-2.1-only.txt` for the full LGPL license, and
 `SOURCE-OFFER.md` for the version-matched corresponding source location.

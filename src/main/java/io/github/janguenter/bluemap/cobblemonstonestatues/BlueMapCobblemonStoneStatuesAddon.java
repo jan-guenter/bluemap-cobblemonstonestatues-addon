@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 package io.github.janguenter.bluemap.cobblemonstonestatues;
 
-import io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522.AdapterCompatibility;
+import io.github.janguenter.bluemap.addon.adapter.api.bluemap523.BlueMapRuntimeCompatibility;
+import io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523.JomlRuntimeCompatibility;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -15,12 +16,13 @@ public final class BlueMapCobblemonStoneStatuesAddon implements Runnable {
     @Override
     public void run() {
         try {
-            if (!AdapterCompatibility.currentRuntimeSupported()) {
+            if (!BlueMapRuntimeCompatibility.matchesCurrent()
+                    || !JomlRuntimeCompatibility.matchesCurrent()) {
                 inactive("unsupported BlueMap internal ABI", null);
                 return;
             }
             Class<?> adapter = Class.forName(
-                    "io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap522.BlueMap522Adapter",
+                    "io.github.janguenter.bluemap.cobblemonstonestatues.adapter.bluemap523.BlueMap523Adapter",
                     true,
                     BlueMapCobblemonStoneStatuesAddon.class.getClassLoader()
             );
