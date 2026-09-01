@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "status": "owner-accepted-release-candidate",
+  "version": "0.1.0-alpha.2",
+  "release_date": "2026-09-01",
+  "repository": "https://github.com/jan-guenter/bluemap-cobblemonstonestatues-addon",
+  "tag": "v0.1.0-alpha.2",
+  "bluemap": {
+    "commit": "7e07f4e74ec1e92a6ead9aa1e66054af3e133aac",
+    "api_commit": "285c9a60eff3ac2b0cab308ce1058d1565be0971",
+    "version": "5.22-feature.backport-5.23-stateless-java-web-server-46"
+  },
+  "adapter_api": {
+    "version": "0.1.0-alpha.2",
+    "commit": "e81f08bc4bfbf02d810ec8949a019130e2e61634",
+    "source_tree": "2f974c9bb2ba13888d69682f86f30f58922d30eb",
+    "source_files_bundled": 4,
+    "module_jar_bundled": false
+  },
+  "release_artifacts": {
+    "production_jar": {
+      "file_name": "bluemap-cobblemonstonestatues-addon-0.1.0-alpha.2.jar",
+      "size": 291240,
+      "sha256": "20108b9de728a92a91da458d4ba9aa91d0c83ea5fe65549a8b308c97a0c67617"
+    },
+    "production_sources_jar": {
+      "file_name": "bluemap-cobblemonstonestatues-addon-0.1.0-alpha.2-sources.jar",
+      "size": 122460,
+      "sha256": "24a953c56bb8b019ce21007d93982b0007209a8c1a06875b420b64d5e4ccedc8"
+    },
+    "exporter_jar": {
+      "file_name": "atmons-stone-pose-exporter-0.1.0-alpha.2.jar",
+      "size": 285447,
+      "sha256": "bdc09212215e463840f364c683b9bdc663968a11bf0aed665a515db4f71510af"
+    },
+    "exporter_sources_jar": {
+      "file_name": "atmons-stone-pose-exporter-0.1.0-alpha.2-sources.jar",
+      "size": 104193,
+      "sha256": "a5b1b95be96068e6428589824f834d6a846326ba624e826acb8ad1147c59470e"
+    }
+  },
+  "verification": {
+    "production_jar_matches_accepted_staging_candidate": true,
+    "production_jar_byte_reproducible": true,
+    "exact_input_gate": true,
+    "combined_staging_visual_acceptance": "2026-09-01"
+  }
+}

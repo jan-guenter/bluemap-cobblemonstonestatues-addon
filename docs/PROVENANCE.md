@@ -27,6 +27,11 @@ BlueMap Botany Pots Add-on release `v0.1.0-alpha.1`, commit
 `f40eed6c1f7f30356bcdfabbc3e2a6455fec7884`, whose complete project license is
 LGPL-2.1-only. The helper does not compile or package this adapter layer.
 
+Four MIT adapter helpers compile from BlueMap Add-on Adapter API
+`0.1.0-alpha.2`, commit `e81f08bc4bfbf02d810ec8949a019130e2e61634`, and
+source tree `2f974c9bb2ba13888d69682f86f30f58922d30eb`. The add-on packages the
+module license but not its JAR.
+
 The replacement box compiler was produced behind a clean-room boundary from
 the Microsoft Bedrock geometry schema/visual documentation and a sanitized
 13-case raw-f32 runtime fixture. The normative local specification is

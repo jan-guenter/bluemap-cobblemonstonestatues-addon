@@ -1,7 +1,8 @@
 # BlueMap Cobblemon Stone Statues Add-on
 
-This is a BlueMap 5.22 add-on for Cobblemon Stone Statues 1.1 in the exact All
-the Mons 1.2.0 environment. Version `0.1.0-alpha.1` is the owner-accepted
+This is a BlueMap 5.23 feature-backport add-on for Cobblemon Stone Statues 1.1
+in the exact All the Mons 1.2.0 environment. Version `0.1.0-alpha.2` is the
+owner-accepted
 bounded prerelease; it is not a generic compatibility or production-deployment
 claim.
 
@@ -27,7 +28,11 @@ texture counts come from the connected exporter run and must be complete.
 
 ## Required runtime inputs
 
-- BlueMap backport commit `9be321df995a1103808621d529eb72773e719d4d`
+- BlueMap backport commit `7e07f4e74ec1e92a6ead9aa1e66054af3e133aac`
+  and API commit `285c9a60eff3ac2b0cab308ce1058d1565be0971`
+- BlueMap Add-on Adapter API `0.1.0-alpha.2`, commit
+  `e81f08bc4bfbf02d810ec8949a019130e2e61634`, source tree
+  `2f974c9bb2ba13888d69682f86f30f58922d30eb`
 - Cobblemon Stone Statues 1.1, 170,977 bytes, SHA-256
   `0fece8e5a988b660f2b608a316f88e2572290835fec1acf67d78329133e92f09`
 - Cobblemon 1.7.3+1.21.1, 128,748,941 bytes, SHA-256

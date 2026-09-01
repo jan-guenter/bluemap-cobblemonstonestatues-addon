@@ -1,6 +1,15 @@
 # Releasing
 
-Release only an owner-accepted renderer from a clean reviewed commit.
+Release only an owner-accepted renderer from a clean reviewed commit. The
+prepared candidate is `0.1.0-alpha.2`; its four JAR identities are locked in
+`provenance/release.json` and `docs/RELEASE.md`.
+
+Initialize the exact toolkit and Adapter API gitlinks before running gates:
+
+```bash
+git submodule update --init --recursive -- \
+  tooling/bluemap-addon-toolkit modules/bluemap-addon-adapter-api
+```
 
 1. Confirm the exact All the Mons, Minecraft, NeoForge, Java, BlueMap, and
    candidate-mod identities documented by this repository.

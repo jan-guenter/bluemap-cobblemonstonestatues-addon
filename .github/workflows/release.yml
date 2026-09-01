@@ -153,7 +153,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: jan-guenter/BlueMap
-          ref: 9be321df995a1103808621d529eb72773e719d4d
+          ref: 7e07f4e74ec1e92a6ead9aa1e66054af3e133aac
           path: .ci/bluemap
           submodules: recursive
           persist-credentials: false
@@ -245,18 +245,18 @@ jobs:
             tools/pose-exporter/build/publications/exporter/module.json
 
           test "$(stat -c %s "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar")" \
-            -eq 286752
+            -eq 291240
           test "$(stat -c %s "build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar")" \
-            -eq 118224
+            -eq 122460
           test "$(stat -c %s "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar")" \
-            -eq 284840
+            -eq 285447
           test "$(stat -c %s "tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar")" \
-            -eq 103586
+            -eq 104193
           sha256sum --check <<SHA256SUMS
-          9800484109aa7e571f393aa96b069e6248186c35103b6e26fd9dad920e4efcd4  build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar
-          61d6d640792e88526998e5f2e4f8f3228acb8add360cb3b8de670e383d73d4ac  build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar
-          f35727ba2ce5c96abe085df36d5d02534b6a19e1f710eb4c145c0d7243c75b98  tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar
-          fc4a4c0808b006ec07c8a17965c800b2e612ac11e0ed755749824d3524c61dde  tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar
+          20108b9de728a92a91da458d4ba9aa91d0c83ea5fe65549a8b308c97a0c67617  build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}.jar
+          24a953c56bb8b019ce21007d93982b0007209a8c1a06875b420b64d5e4ccedc8  build/libs/bluemap-cobblemonstonestatues-addon-${VERSION}-sources.jar
+          bdc09212215e463840f364c683b9bdc663968a11bf0aed665a515db4f71510af  tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}.jar
+          a5b1b95be96068e6428589824f834d6a846326ba624e826acb8ad1147c59470e  tools/pose-exporter/build/libs/atmons-stone-pose-exporter-${VERSION}-sources.jar
           SHA256SUMS
 
       - name: Prepare exact four-JAR release boundary
@@ -469,7 +469,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes='Owner-accepted exact All the Mons 1.2.0 prerelease for Cobblemon Stone Statues 1.1, Cobblemon 1.7.3, and the Java 21 BlueMap 5.22 backport. Production activation requires a complete operator-local exact-client bundle and exact winning resources; the bundle and third-party assets are not distributed. This is not a generic compatibility or production-deployment claim.'
+          notes='Owner-accepted exact All the Mons 1.2.0 prerelease for Cobblemon Stone Statues 1.1, Cobblemon 1.7.3, and the Java 21 BlueMap 5.23 feature backport. Production activation requires a complete operator-local exact-client bundle and exact winning resources; the bundle and third-party assets are not distributed. This is not a generic compatibility or production-deployment claim.'
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             is_draft="$(gh release view "${RELEASE_TAG}" \
               --json isDraft --jq '.isDraft')"
